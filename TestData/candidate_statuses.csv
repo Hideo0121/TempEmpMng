@@ -1,0 +1,6 @@
+code,label,color_code,sort_order,is_active
+ST01,職場見学待,#E8F0FE,1,1
+ST02,判定中,#FFF7CC,2,1
+ST03,就業決定,#E6FFEA,3,1
+ST04,辞退,#CFCFCF,4,1
+ST05,見送り,#CFCFCF,5,1

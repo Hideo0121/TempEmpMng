@@ -1,0 +1,35 @@
+name: Deploy Staging (IIS)
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: self-hosted  # ← IIS サーバに設定したランナー
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Composer install (no-dev)
+        run: composer install --no-interaction --prefer-dist --no-dev
+
+      - name: Build assets (optional)
+        run: |
+          if exist package.json ( npm ci && npm run build ) else ( echo "No frontend" )
+
+      - name: Copy to IIS site
+        shell: powershell
+        run: |
+          $src = "$(pwd)"
+          $dst = "D:\inetpub\wwwroot\app-stg"
+          robocopy $src $dst /MIR /XD .git .github node_modules vendor\bin storage\logs
+          # ストレージと.env はサーバー側管理を推奨
+          robocopy "$src\vendor" "$dst\vendor" /MIR
+
+      - name: Migrate
+        shell: powershell
+        run: |
+          cd D:\inetpub\wwwroot\app-stg
+          php artisan migrate --force
+          php artisan config:cache
+          php artisan route:cache
+          php artisan view:cache
