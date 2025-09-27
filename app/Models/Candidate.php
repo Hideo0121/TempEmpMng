@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\CandidateStatusHistory;
 use App\Models\JobCategory;
+use App\Models\SkillSheet;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Collection;
 
 class Candidate extends Model
@@ -51,6 +54,16 @@ class Candidate extends Model
         return $this->belongsTo(JobCategory::class, 'wish_job3_id');
     }
 
+    public function decidedJob(): BelongsTo
+    {
+        return $this->belongsTo(JobCategory::class, 'decided_job_category_id');
+    }
+
+    public function confirmedInterview(): HasOne
+    {
+        return $this->hasOne(Interview::class)->latestOfMany('scheduled_at');
+    }
+
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -69,6 +82,16 @@ class Candidate extends Model
     public function views(): HasMany
     {
         return $this->hasMany(CandidateView::class);
+    }
+
+    public function skillSheets(): HasMany
+    {
+        return $this->hasMany(SkillSheet::class);
+    }
+
+    public function statusHistories(): HasMany
+    {
+        return $this->hasMany(CandidateStatusHistory::class);
     }
 
     public function handlerCollection(): Collection

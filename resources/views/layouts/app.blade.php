@@ -17,27 +17,27 @@
 </head>
 <body class="min-h-screen bg-slate-100 text-slate-800">
     <header class="bg-blue-700 text-white shadow-lg">
-        <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+    <div class="mx-auto flex max-w-[110rem] items-center justify-between px-6 py-4">
             <div class="text-xl font-semibold">
                 <a href="{{ route('dashboard') }}" class="transition hover:text-blue-100">短期派遣受入管理システム</a>
             </div>
             @auth
                 <nav class="flex items-center gap-3 text-sm font-medium">
-                    <a href="{{ route('candidates.create') }}" class="rounded-full bg-white/10 px-4 py-2 transition hover:bg-white/20">紹介者登録</a>
-                    <a href="{{ route('candidates.index') }}" class="rounded-full bg-white/10 px-4 py-2 transition hover:bg-white/20">紹介者一覧</a>
+                    <a href="{{ route('candidates.create') }}" class="inline-flex items-center justify-center rounded-full bg-white/10 px-4 py-2 transition hover:bg-white/20">紹介者登録</a>
+                    <a href="{{ route('candidates.index') }}" class="inline-flex items-center justify-center rounded-full bg-white/10 px-4 py-2 transition hover:bg-white/20">紹介者一覧</a>
                     @if (auth()->user()?->isManager())
-                        <a href="{{ route('masters.index') }}" class="rounded-full bg-white/10 px-4 py-2 transition hover:bg-white/20">マスタ管理</a>
+                        <a href="{{ route('masters.index') }}" class="inline-flex items-center justify-center rounded-full bg-white/10 px-4 py-2 transition hover:bg-white/20">マスタ管理</a>
                     @endif
-                    <form method="POST" action="{{ route('logout') }}">
+                    <form method="POST" action="{{ route('logout') }}" class="contents">
                         @csrf
-                        <button type="submit" class="rounded-full bg-white px-4 py-2 text-blue-700 transition hover:bg-blue-50">ログアウト</button>
+                        <button type="submit" class="inline-flex items-center justify-center rounded-full bg-white px-4 py-2 text-blue-700 transition hover:bg-blue-50">ログアウト</button>
                     </form>
                 </nav>
             @endauth
         </div>
     </header>
 
-    <main class="mx-auto w-full max-w-7xl px-6 py-10">
+    <main class="mx-auto w-full max-w-[110rem] px-6 py-10">
         @hasSection('pageTitle')
             <div class="mb-8">
                 <h1 class="text-2xl font-bold text-slate-900">@yield('pageTitle')</h1>
@@ -47,13 +47,19 @@
             </div>
         @endif
 
+        @if (session('status'))
+            <div class="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm font-semibold text-emerald-700 shadow">
+                {{ session('status') }}
+            </div>
+        @endif
+
         <div class="space-y-8">
             @yield('content')
         </div>
     </main>
 
     <footer class="border-t border-slate-200 bg-white">
-        <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 text-xs text-slate-500">
+    <div class="mx-auto flex max-w-[110rem] items-center justify-between px-6 py-4 text-xs text-slate-500">
             <span>© {{ date('Y') }} TempEmpMng. 内部利用専用。</span>
             <span>Ver. 0.1.0-prototype</span>
         </div>

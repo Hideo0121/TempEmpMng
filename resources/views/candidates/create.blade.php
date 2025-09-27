@@ -11,5 +11,9 @@
         'jobCategories' => $jobCategories,
         'handlers' => $handlers,
         'candidateStatuses' => $candidateStatuses,
+        'skillSheets' => collect(),
+        'formAction' => $formAction ?? route('candidates.store'),
+        'httpMethod' => $httpMethod ?? 'POST',
+        'confirmedInterview' => $confirmedInterview,
     ])
 @endsection

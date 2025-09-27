@@ -44,7 +44,8 @@
         ],
         "post-create-project-cmd": [
             "@php artisan key:generate --ansi",
-            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
+            "@php -r \"is_dir('storage/app/database') || mkdir('storage/app/database', 0755, true);\"",
+            "@php -r \"file_exists('storage/app/database/database.sqlite') || touch('storage/app/database/database.sqlite');\"",
             "@php artisan migrate --graceful --ansi"
         ],
         "dev": [

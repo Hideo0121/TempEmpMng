@@ -10,7 +10,12 @@
                 <h2 class="text-lg font-semibold text-slate-900">派遣会社一覧</h2>
                 <p class="text-sm text-slate-500">有効な会社が上位に表示されます。連絡先や備考を定期的に更新してください。</p>
             </div>
-            <a href="{{ route('masters.agencies.create') }}" class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500">新規追加</a>
+            <div class="flex flex-wrap items-center justify-end gap-2">
+                <a href="{{ route('masters.job-categories.index') }}" class="inline-flex items-center justify-center rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50">希望職種一覧</a>
+                <a href="{{ route('masters.candidate-statuses.index') }}" class="inline-flex items-center justify-center rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50">ステータス一覧</a>
+                <a href="{{ route('masters.users.index') }}" class="inline-flex items-center justify-center rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50">ユーザ一覧</a>
+                <a href="{{ route('masters.agencies.create') }}" class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500">新規追加</a>
+            </div>
         </header>
 
         @if (session('status'))
@@ -40,12 +45,12 @@
                         name="file"
                         accept=".csv,text/csv"
                         required
-                        class="block w-full min-w-[17rem] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                        class="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 md:w-64 lg:w-72"
                     >
                     <button
                         type="submit"
-                        class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"
-                    >取り込み</button>
+                        class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 whitespace-nowrap"
+                    >取込</button>
                 </form>
             </div>
         </div>

@@ -10,7 +10,12 @@
                 <h2 class="text-lg font-semibold text-slate-900">希望職種一覧</h2>
                 <p class="text-sm text-slate-500">表示順の昇順で表示しています。無効化した項目はグレー表示です。</p>
             </div>
-            <a href="{{ route('masters.job-categories.create') }}" class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500">新規追加</a>
+            <div class="flex flex-wrap items-center justify-end gap-2">
+                <a href="{{ route('masters.agencies.index') }}" class="inline-flex items-center justify-center rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50">派遣会社一覧</a>
+                <a href="{{ route('masters.candidate-statuses.index') }}" class="inline-flex items-center justify-center rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50">ステータス一覧</a>
+                <a href="{{ route('masters.users.index') }}" class="inline-flex items-center justify-center rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50">ユーザ一覧</a>
+                <a href="{{ route('masters.job-categories.create') }}" class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500">新規追加</a>
+            </div>
         </header>
 
         @if (session('status'))
@@ -44,8 +49,8 @@
                     >
                     <button
                         type="submit"
-                        class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"
-                    >取り込み</button>
+                        class="inline-flex items-center justify-center whitespace-nowrap rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"
+                    >取込</button>
                 </form>
             </div>
         </div>

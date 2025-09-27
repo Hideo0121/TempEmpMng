@@ -1,6 +1,7 @@
 @php
     $mode = $mode ?? 'create';
     $formAction = $formAction ?? '#';
+    $httpMethod = strtoupper($httpMethod ?? 'POST');
     $submitLabel = $mode === 'edit' ? '更新する' : '登録する';
     $draftLabel = $mode === 'edit' ? '下書き保存' : '下書き保存';
     $titleSuffix = $mode === 'edit' ? '（編集）' : '（新規）';
@@ -10,6 +11,7 @@
     $handlers = $handlers ?? collect();
     $candidateStatuses = $candidateStatuses ?? collect();
     $defaultStatusCode = optional($candidateStatuses->first())->code;
+    $backUrl = $backUrl ?? null;
     $selectedAgencyId = old('agency_id', optional($candidate)->agency_id);
     $selectedWishJobs = [
         1 => old('wish_job1', optional($candidate)->wish_job1_id),
@@ -21,9 +23,64 @@
         2 => old('handler2', optional($candidate)->handler2_user_id),
     ];
     $selectedStatusCode = old('status', optional($candidate)->status_code ?? $defaultStatusCode);
+    $decidedJobId = old('decided_job', optional($candidate)->decided_job_category_id);
+    $employedStatusCodes = collect($employedStatusCodes ?? \App\Models\CandidateStatus::employedCodes())
+        ->map(fn ($code) => mb_strtolower((string) $code))
+        ->filter()
+        ->values()
+        ->all();
+    $decidedJobVisible = \App\Models\CandidateStatus::isEmployed((string) $selectedStatusCode);
+    $today = now()->format('Y-m-d');
+    $visitDateValues = [
+        1 => old('visit_candidate1_date', optional(optional($candidate)->visit_candidate1_at)->format('Y-m-d')),
+        2 => old('visit_candidate2_date', optional(optional($candidate)->visit_candidate2_at)->format('Y-m-d')),
+        3 => old('visit_candidate3_date', optional(optional($candidate)->visit_candidate3_at)->format('Y-m-d')),
+    ];
+    $visitTimeValues = [
+        1 => old('visit_candidate1_time', optional(optional($candidate)->visit_candidate1_at)->format('H:i')),
+        2 => old('visit_candidate2_time', optional(optional($candidate)->visit_candidate2_at)->format('H:i')),
+        3 => old('visit_candidate3_time', optional(optional($candidate)->visit_candidate3_at)->format('H:i')),
+    ];
+    $skillSheets = collect($skillSheets ?? ($candidate ? $candidate->skillSheets : []));
+    $existingSkillSheetCount = $skillSheets->count();
+    $confirmedInterview = $confirmedInterview ?? null;
+    $confirmedScheduledAt = optional($confirmedInterview)->scheduled_at;
+    $confirmedVisitDate = old('visit_confirmed_date', optional($confirmedScheduledAt)->format('Y-m-d'));
+    $confirmedVisitTime = old('visit_confirmed_time', optional($confirmedScheduledAt)->format('H:i'));
+    $remind30mOld = old('remind_30m_enabled');
+    $remind30mEnabled = $remind30mOld !== null ? filter_var($remind30mOld, FILTER_VALIDATE_BOOLEAN) : (optional($confirmedInterview)->remind_30m_enabled ?? true);
+    $formatFileSize = static function (?int $bytes): string {
+        if (empty($bytes)) {
+            return '0KB';
+        }
+
+        if ($bytes >= 1048576) {
+            return number_format($bytes / 1048576, 1) . 'MB';
+        }
+
+        return number_format($bytes / 1024, 0) . 'KB';
+    };
+    $formatTimestamp = static function ($dateTime): string {
+        if (!$dateTime) {
+            return '';
+        }
+
+        if ($dateTime instanceof \DateTimeInterface) {
+            return $dateTime->format('Y-m-d H:i');
+        }
+
+        return \Illuminate\Support\Carbon::parse($dateTime)->format('Y-m-d H:i');
+    };
 @endphp
 
 <form class="space-y-6" method="post" action="{{ $formAction }}" enctype="multipart/form-data">
+    @csrf
+    @if ($httpMethod !== 'POST')
+        @method($httpMethod)
+    @endif
+    @if ($backUrl)
+        <input type="hidden" name="back" value="{{ $backUrl }}">
+    @endif
     <section class="rounded-3xl bg-white p-6 shadow-md">
         <header class="flex items-center justify-between border-b border-slate-200 pb-4">
             <div>
@@ -36,13 +93,19 @@
         <div class="mt-6 grid gap-6 md:grid-cols-2">
             <div>
                 <label for="name" class="block text-sm font-semibold text-slate-700">氏名<span class="ml-1 text-red-500">*</span></label>
-                <input id="name" name="name" type="text" placeholder="例）山田 太郎"
+                <input id="name" name="name" type="text" placeholder="例）山田 太郎" value="{{ old('name', optional($candidate)->name) }}"
                     class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                @error('name')
+                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                @enderror
             </div>
             <div>
                 <label for="name_kana" class="block text-sm font-semibold text-slate-700">氏名（カナ）<span class="ml-1 text-red-500">*</span></label>
-                <input id="name_kana" name="name_kana" type="text" placeholder="例）ヤマダ タロウ"
+                <input id="name_kana" name="name_kana" type="text" placeholder="例）ヤマダ タロウ" value="{{ old('name_kana', optional($candidate)->name_kana) }}"
                     class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                @error('name_kana')
+                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                @enderror
             </div>
             <div>
                 <label for="agency_id" class="block text-sm font-semibold text-slate-700">派遣会社<span class="ml-1 text-red-500">*</span></label>
@@ -55,19 +118,25 @@
                         </option>
                     @endforeach
                 </select>
+                @error('agency_id')
+                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                @enderror
             </div>
             <div>
                 <label for="introduced_on" class="block text-sm font-semibold text-slate-700">紹介日<span class="ml-1 text-red-500">*</span></label>
-                <input id="introduced_on" name="introduced_on" type="date"
+                <input id="introduced_on" name="introduced_on" type="date" value="{{ old('introduced_on', optional(optional($candidate)->introduced_on)->format('Y-m-d') ?? $today) }}"
                     class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                @error('introduced_on')
+                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                @enderror
             </div>
         </div>
 
         <div class="mt-6 grid gap-4 md:grid-cols-3">
             @for ($i = 1; $i <= 3; $i++)
                 <div>
-                    <label class="block text-sm font-semibold text-slate-700">第{{ $i }}希望職種</label>
-                    <select name="wish_job{{ $i }}"
+                    <label class="block text-sm font-semibold text-slate-700">第{{ $i }}希望職種@if ($i === 1)<span class="ml-1 text-red-500">*</span>@endif</label>
+                    <select name="wish_job{{ $i }}" @if ($i === 1) required @endif
                         class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
                         <option value="">選択してください</option>
                         @foreach ($jobCategories as $jobCategory)
@@ -76,6 +145,9 @@
                             </option>
                         @endforeach
                     </select>
+                    @error("wish_job{$i}")
+                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                    @enderror
                 </div>
             @endfor
         </div>
@@ -95,11 +167,17 @@
                 <div class="rounded-2xl border border-slate-200 p-4">
                     <p class="text-sm font-semibold text-slate-700">見学候補 {{ $i }}</p>
                     <div class="mt-2 flex gap-2">
-                        <input type="date" name="visit_candidate{{ $i }}_date"
+                        <input type="date" name="visit_candidate{{ $i }}_date" value="{{ $visitDateValues[$i] }}"
                             class="w-1/2 rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                        <input type="time" name="visit_candidate{{ $i }}_time"
+                        <input type="time" name="visit_candidate{{ $i }}_time" value="{{ $visitTimeValues[$i] }}"
                             class="w-1/2 rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
                     </div>
+                    @error("visit_candidate{$i}_date")
+                        <p class="mt-2 text-xs text-red-600">{{ $message }}</p>
+                    @enderror
+                    @error("visit_candidate{$i}_time")
+                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                    @enderror
                 </div>
             @endfor
         </div>
@@ -116,6 +194,9 @@
                         </option>
                     @endforeach
                 </select>
+                @error('handler1')
+                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                @enderror
             </div>
             <div>
                 <label class="block text-sm font-semibold text-slate-700">職場見学対応者 2</label>
@@ -128,7 +209,44 @@
                         </option>
                     @endforeach
                 </select>
+                @error('handler2')
+                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                @enderror
             </div>
+        </div>
+
+        <div class="mt-6 rounded-2xl border border-slate-200 p-5">
+            <p class="text-sm font-semibold text-slate-700">見学確定日時</p>
+            <p class="mt-1 text-xs text-slate-500">候補日から正式決定した日時を入力してください。空欄の場合は確定日程なしとして扱います。</p>
+            <div class="mt-4 grid gap-4 md:grid-cols-2">
+                <div>
+                    <label for="visit_confirmed_date" class="block text-xs font-semibold text-slate-600">確定日</label>
+                    <input type="date" id="visit_confirmed_date" name="visit_confirmed_date" value="{{ $confirmedVisitDate }}"
+                        class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                    @error('visit_confirmed_date')
+                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+                <div>
+                    <label for="visit_confirmed_time" class="block text-xs font-semibold text-slate-600">確定時間</label>
+                    <input type="time" id="visit_confirmed_time" name="visit_confirmed_time" value="{{ $confirmedVisitTime }}"
+                        class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                    @error('visit_confirmed_time')
+                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+            </div>
+            <div class="mt-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <input type="hidden" name="remind_30m_enabled" value="0">
+                    <input type="checkbox" id="remind_30m_enabled" name="remind_30m_enabled" value="1" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" @checked($remind30mEnabled)>
+                    <label for="remind_30m_enabled">30分前リマインドを送信する</label>
+                </div>
+                <p class="text-xs text-slate-500">リマインドをOFFにすると 30 分前メールは送信されません。他のリマインドには影響しません。</p>
+            </div>
+            @error('remind_30m_enabled')
+                <p class="mt-2 text-xs text-red-600">{{ $message }}</p>
+            @enderror
         </div>
     </section>
 
@@ -145,25 +263,34 @@
             <div>
                 <label class="block text-sm font-semibold text-slate-700" for="transport_day">交通費（日額）</label>
                 <div class="mt-1 flex items-center gap-2">
-                    <input id="transport_day" name="transport_day" type="number" min="0" step="1"
+                    <input id="transport_day" name="transport_day" type="number" min="0" step="1" value="{{ old('transport_day', optional($candidate)->transport_cost_day) }}"
                         class="w-full rounded-xl border border-slate-300 px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
                     <span class="text-sm text-slate-500">円</span>
                 </div>
+                @error('transport_day')
+                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                @enderror
             </div>
             <div>
                 <label class="block text-sm font-semibold text-slate-700" for="transport_month">交通費（月額）</label>
                 <div class="mt-1 flex items-center gap-2">
-                    <input id="transport_month" name="transport_month" type="number" min="0" step="1"
+                    <input id="transport_month" name="transport_month" type="number" min="0" step="1" value="{{ old('transport_month', optional($candidate)->transport_cost_month) }}"
                         class="w-full rounded-xl border border-slate-300 px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
                     <span class="text-sm text-slate-500">円</span>
                 </div>
+                @error('transport_month')
+                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                @enderror
             </div>
         </div>
 
         <div class="mt-6">
             <label class="block text-sm font-semibold text-slate-700" for="other_conditions">その他条件</label>
             <textarea id="other_conditions" name="other_conditions" rows="4" placeholder="例）週3日稼働希望、PC貸与必須など"
-                class="mt-1 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"></textarea>
+                class="mt-1 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">{{ old('other_conditions', optional($candidate)->other_conditions) }}</textarea>
+            @error('other_conditions')
+                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+            @enderror
         </div>
 
         <div class="mt-6 grid gap-6 md:grid-cols-2">
@@ -177,19 +304,44 @@
                         </option>
                     @endforeach
                 </select>
+                @error('status')
+                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                @enderror
             </div>
             <div>
                 <label class="block text-sm font-semibold text-slate-700" for="status_changed_on">状態変化日</label>
-                <input id="status_changed_on" name="status_changed_on" type="date"
+                <input id="status_changed_on" name="status_changed_on" type="date" value="{{ old('status_changed_on', optional(optional($candidate)->status_changed_on)->format('Y-m-d')) }}"
                     class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                @error('status_changed_on')
+                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                @enderror
             </div>
+        </div>
+
+    <div class="mt-6" data-decided-job-wrapper data-status-employed='@json($employedStatusCodes)'>
+            <label class="block text-sm font-semibold text-slate-700" for="decided_job">就業する職種<span class="ml-1 text-xs font-normal text-slate-500">（就業決定時のみ必須）</span></label>
+            <select id="decided_job" name="decided_job" class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200" @disabled(! $decidedJobVisible)>
+                <option value="">選択してください</option>
+                @foreach ($jobCategories as $jobCategory)
+                    <option value="{{ $jobCategory->id }}" @selected((string) $decidedJobId === (string) $jobCategory->id)>
+                        {{ $jobCategory->name }}
+                    </option>
+                @endforeach
+            </select>
+            <p class="mt-1 text-xs text-slate-500">ステータスが「就業決定」のときに確定した就業職種を選択します。</p>
+            @error('decided_job')
+                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+            @enderror
         </div>
 
         <div class="mt-6">
             <label class="block text-sm font-semibold text-slate-700" for="introduction_note">紹介文</label>
             <textarea id="introduction_note" name="introduction_note" rows="4" placeholder="派遣会社からの紹介コメントを貼り付けてください。"
-                class="mt-1 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"></textarea>
+                class="mt-1 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">{{ old('introduction_note', optional($candidate)->introduction_note) }}</textarea>
             <button type="button" class="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-blue-600 hover:underline">入力欄を追加</button>
+            @error('introduction_note')
+                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+            @enderror
         </div>
     </section>
 
@@ -203,42 +355,135 @@
         </header>
 
         <div class="mt-6 grid gap-4 md:grid-cols-2">
-            <label for="skill_sheets" class="group flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center transition hover:border-blue-400 hover:bg-blue-50">
+            <label for="skill_sheets"
+                class="group flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center transition hover:border-blue-400 hover:bg-blue-50"
+                data-skill-dropzone
+                data-skill-existing-count="{{ $existingSkillSheetCount }}">
                 <span class="text-3xl">📄</span>
                 <span class="mt-3 text-sm font-semibold text-slate-700">ここにPDFをドラッグ＆ドロップ</span>
                 <span class="mt-1 text-xs text-slate-500">またはクリックしてファイルを選択</span>
-                <input id="skill_sheets" name="skill_sheets[]" type="file" accept="application/pdf" multiple class="hidden">
+                <input id="skill_sheets" name="skill_sheets[]" type="file" accept="application/pdf" multiple class="hidden" data-skill-input>
             </label>
 
-            <div class="space-y-3">
-                <div class="rounded-2xl border border-slate-200 p-4">
-                    <div class="flex items-center justify-between text-sm text-slate-700">
-                        <span>skillsheet_yamada.pdf</span>
-                        <span class="text-xs text-slate-400">2.4MB · 2025-09-20 09:12</span>
+            <div>
+                <p data-skill-feedback class="mt-2 hidden text-xs font-semibold"></p>
+
+                <div data-skill-pending-section class="mt-4 hidden space-y-3 rounded-2xl border border-blue-200 bg-white p-4">
+                    <div class="flex items-center justify-between text-xs font-semibold text-blue-700">
+                        <span>アップロード予定のファイル</span>
+                        <button type="button" data-skill-clear class="rounded-full border border-blue-200 px-2 py-1 text-[11px] font-semibold text-blue-600 transition hover:bg-blue-50">すべて取り消す</button>
                     </div>
-                    <div class="mt-3 h-2 rounded-full bg-slate-200">
-                        <div class="h-2 rounded-full bg-blue-500" style="width: 100%"></div>
-                    </div>
+                    <div data-skill-pending-list class="space-y-3"></div>
                 </div>
-                <div class="rounded-2xl border border-slate-200 p-4">
-                    <div class="flex items-center justify-between text-sm text-slate-700">
-                        <span>portfolio_hanako.pdf</span>
-                        <span class="text-xs text-amber-500">アップロード待機中</span>
+
+                @php
+                    $skillSheetErrors = collect($errors->get('skill_sheets'))->merge(
+                        collect($errors->get('skill_sheets.*'))->flatten()
+                    );
+                @endphp
+                @if ($skillSheetErrors->isNotEmpty())
+                    <div class="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-600">
+                        <ul class="space-y-1">
+                            @foreach ($skillSheetErrors as $message)
+                                <li>{{ $message }}</li>
+                            @endforeach
+                        </ul>
                     </div>
-                    <div class="mt-3 h-2 rounded-full bg-slate-200">
-                        <div class="h-2 rounded-full bg-amber-400" style="width: 35%"></div>
-                    </div>
-                    <p class="mt-2 text-xs text-amber-500">残り 5MB / エラーなし</p>
+                @endif
+
+                <div class="mt-4 space-y-3" data-skill-existing-list>
+                    @forelse ($skillSheets as $sheet)
+                        @php
+                            $sizeLabel = $formatFileSize($sheet->size_bytes ?? null);
+                            $uploadedLabel = $formatTimestamp($sheet->updated_at ?? $sheet->created_at);
+                        @endphp
+                        <div class="rounded-2xl border border-slate-200 p-4">
+                            <div class="flex items-center justify-between gap-3 text-sm text-slate-700">
+                                <span class="truncate" title="{{ $sheet->original_name }}">{{ $sheet->original_name }}</span>
+                                <span class="shrink-0 text-xs text-slate-400">
+                                    {{ $sizeLabel }}@if($uploadedLabel) · {{ $uploadedLabel }}@endif
+                                </span>
+                            </div>
+                            <div class="mt-3 h-2 rounded-full bg-slate-200" aria-hidden="true">
+                                <div class="h-2 rounded-full bg-blue-500" style="width: 100%"></div>
+                            </div>
+                            <div class="mt-3 flex items-center justify-between text-xs text-slate-500">
+                                <span class="inline-flex items-center gap-1 font-semibold text-blue-600">
+                                    <span class="inline-block h-2 w-2 rounded-full bg-blue-500"></span>
+                                    アップロード済み
+                                </span>
+                                @if(!empty($sheet->note))
+                                    <span class="ml-3 truncate text-slate-400" title="{{ $sheet->note }}">{{ $sheet->note }}</span>
+                                @endif
+                            </div>
+                        </div>
+                    @empty
+                        <div data-skill-empty-placeholder class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                            まだアップロードされたスキルシートはありません。
+                        </div>
+                    @endforelse
                 </div>
             </div>
         </div>
     </section>
 
     <div class="flex items-center justify-between">
-        <a href="{{ route('dashboard') }}" class="rounded-xl border border-slate-300 px-6 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">キャンセル / メニューに戻る</a>
+    <a href="{{ $backUrl ?? ($mode === 'edit' ? route('candidates.index') : route('dashboard')) }}" class="rounded-xl border border-slate-300 px-6 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">キャンセル / メニューに戻る</a>
         <div class="flex items-center gap-3">
             <button type="button" class="rounded-xl border border-slate-300 px-6 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">{{ $draftLabel }}</button>
             <button type="submit" class="rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-500">{{ $submitLabel }}</button>
         </div>
     </div>
 </form>
+
+<script>
+    const initDecidedJobToggle = () => {
+        const statusSelect = document.getElementById('status');
+        const decidedWrapper = document.querySelector('[data-decided-job-wrapper]');
+
+        if (!statusSelect || !decidedWrapper) {
+            return;
+        }
+
+        const employedCodes = (() => {
+            if (!decidedWrapper) {
+                return [];
+            }
+
+            try {
+                const raw = decidedWrapper.dataset.statusEmployed || '[]';
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                    return parsed.map((code) => String(code).toLowerCase());
+                }
+            } catch (error) {
+                console.warn('Failed to parse employed status codes', error);
+            }
+
+            return [];
+        })();
+        const decidedSelect = decidedWrapper.querySelector('select');
+
+        const updateState = () => {
+            const isEmployed = employedCodes.includes((statusSelect.value || '').toLowerCase());
+
+            if (decidedSelect) {
+                decidedSelect.disabled = !isEmployed;
+                decidedSelect.required = isEmployed;
+
+                if (!isEmployed) {
+                    decidedSelect.value = '';
+                }
+            }
+        };
+
+        statusSelect.addEventListener('change', updateState);
+        updateState();
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDecidedJobToggle);
+    } else {
+        initDecidedJobToggle();
+    }
+</script>
