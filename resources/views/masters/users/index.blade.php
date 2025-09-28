@@ -24,6 +24,12 @@
             </div>
         @endif
 
+        @if ($errors->has('test_email'))
+            <div class="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {{ $errors->first('test_email') }}
+            </div>
+        @endif
+
         <div class="mt-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 md:flex-row md:items-center md:justify-between">
             <div class="text-sm text-slate-600">
                 CSVで一括登録・更新ができます。ヘッダ行は <code>name,email,role,is_active,password</code>（任意で先頭に <code>id</code> を追加可）で指定してください。<br>
@@ -97,9 +103,25 @@
                             </td>
                             <td class="px-4 py-2 align-middle whitespace-nowrap text-slate-700">{{ optional($user->updated_at)->format('Y/m/d H:i') }}</td>
                             <td class="px-4 py-2 align-middle whitespace-nowrap">
-                                <a href="{{ route('masters.users.edit', $user) }}" class="inline-flex items-center gap-1 rounded-full border border-blue-200 px-3 py-1 text-xs font-semibold text-blue-600 transition hover:bg-blue-50">
-                                    編集
-                                </a>
+                                <div class="flex flex-col gap-2 sm:flex-row">
+                                    <a href="{{ route('masters.users.edit', $user) }}" class="inline-flex items-center gap-1 rounded-full border border-blue-200 px-3 py-1 text-xs font-semibold text-blue-600 transition hover:bg-blue-50">
+                                        編集
+                                    </a>
+                                    <form
+                                        method="POST"
+                                        action="{{ route('masters.users.test-email', $user) }}"
+                                        onsubmit="return confirm('{{ $user->name }} さん宛にテストメールを送信します。よろしいですか？');"
+                                        class="inline-flex"
+                                    >
+                                        @csrf
+                                        <button
+                                            type="submit"
+                                            class="inline-flex items-center gap-1 rounded-full border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-600 transition hover:bg-emerald-100"
+                                        >
+                                            テスト送信
+                                        </button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     @empty

@@ -47,6 +47,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('agencies', AgencyController::class)->except(['show', 'destroy']);
         Route::get('users/export', [UserController::class, 'export'])->name('users.export');
         Route::post('users/import', [UserController::class, 'import'])->name('users.import');
+        Route::post('users/{user}/test-email', [UserController::class, 'sendTestEmail'])->name('users.test-email');
         Route::resource('users', UserController::class)->except(['show', 'destroy']);
     });
 });

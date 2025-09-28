@@ -6,11 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Master\Concerns\HandlesCsv;
 use App\Http\Requests\MasterCsvImportRequest;
 use App\Http\Requests\UserMasterRequest;
+use App\Mail\UserTestMail;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -72,6 +74,25 @@ class UserController extends Controller
         return redirect()
             ->route('masters.users.index')
             ->with('status', 'ユーザを更新しました。');
+    }
+
+    public function sendTestEmail(User $user): RedirectResponse
+    {
+        if (blank($user->email)) {
+            return back()->withErrors(['test_email' => 'メールアドレスが登録されていないため送信できません。']);
+        }
+
+        try {
+            Mail::to($user->email)->send(new UserTestMail($user));
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()->withErrors([
+                'test_email' => 'テストメールの送信に失敗しました。' . (app()->environment('local') ? ' 詳細: ' . $e->getMessage() : ''),
+            ]);
+        }
+
+        return back()->with('status', 'テストメールを送信しました。（送信先: ' . $user->email . '）');
     }
 
     public function export(): StreamedResponse
