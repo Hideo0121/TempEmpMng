@@ -87,6 +87,59 @@ class SendInterviewReminderJobTest extends TestCase
         }
     }
 
+    public function test_job_sends_thirty_minute_reminder_when_enabled(): void
+    {
+        Mail::fake();
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2025-10-01 09:30:00', 'Asia/Tokyo'));
+
+        try {
+            $this->seedBaselineData();
+
+            $agency = Agency::create([
+                'name' => 'テスト派遣会社',
+                'email' => 'agency@example.com',
+            ]);
+
+            $handler = User::factory()->create([
+                'role' => 'staff',
+                'email' => 'handler@example.com',
+            ]);
+
+            $owner = User::factory()->create([
+                'role' => 'manager',
+                'email' => 'owner@example.com',
+            ]);
+
+            $candidate = Candidate::create([
+                'name' => '佐藤 花子',
+                'name_kana' => 'サトウ ハナコ',
+                'agency_id' => $agency->id,
+                'introduced_on' => '2025-09-20',
+                'status_code' => 'visit_pending',
+                'handler1_user_id' => $handler->id,
+                'created_by' => $owner->id,
+            ]);
+
+            $interview = Interview::create([
+                'candidate_id' => $candidate->id,
+                'scheduled_at' => '2025-10-01 10:00:00',
+                'place' => '第2会議室',
+                'memo' => '入館カードは受付で受け取る',
+                'remind_30m_enabled' => true,
+            ]);
+
+            (new SendInterviewReminderJob())->handle();
+
+            Mail::assertQueued(InterviewReminderMail::class, function (InterviewReminderMail $mail) use ($interview) {
+                return $mail->interview->is($interview) && $mail->slot === 'thirty_minutes';
+            });
+
+            $this->assertTrue($interview->fresh()->remind_30m_sent);
+        } finally {
+            CarbonImmutable::setTestNow();
+        }
+    }
+
     public function test_job_skips_when_no_recipients_available(): void
     {
         Mail::fake();

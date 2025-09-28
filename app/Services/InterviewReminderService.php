@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Interview;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 
 class InterviewReminderService
 {
@@ -61,10 +62,17 @@ class InterviewReminderService
     protected function scheduledAt(Interview $interview): CarbonImmutable
     {
         $timezone = $this->timezone();
+        $scheduled = $interview->scheduled_at;
 
-        return $interview->scheduled_at instanceof CarbonImmutable
-            ? $interview->scheduled_at->setTimezone($timezone)
-            : CarbonImmutable::parse($interview->scheduled_at, $timezone);
+        if ($scheduled instanceof CarbonInterface) {
+            return CarbonImmutable::parse($scheduled->format('Y-m-d H:i:s'), $timezone);
+        }
+
+        if ($scheduled === null) {
+            return CarbonImmutable::now($timezone);
+        }
+
+        return CarbonImmutable::parse((string) $scheduled, $timezone);
     }
 
     protected function timezone(): string
