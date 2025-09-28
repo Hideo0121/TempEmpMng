@@ -71,6 +71,17 @@
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
                 </div>
+                    <div>
+                        <input type="hidden" name="is_employed_state" value="0">
+                        <label class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                            <input type="checkbox" name="is_employed_state" value="1" @checked(old('is_employed_state', $status->is_employed_state)) class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                            就業判定対象にする
+                        </label>
+                        <p class="mt-1 text-xs text-slate-500">「就業する職種」の必須制御など、就業決定ステータスとして扱います。</p>
+                        @error('is_employed_state')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
             </div>
 
             <div class="flex items-center justify-end gap-3">

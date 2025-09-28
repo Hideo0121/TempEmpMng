@@ -26,7 +26,7 @@
 
         <div class="mt-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 md:flex-row md:items-center md:justify-between">
             <div class="text-sm text-slate-600">
-                CSVで一括登録・更新ができます。ヘッダ行は <code>code,label,color_code,sort_order,is_active</code> の順で指定してください。
+                CSVで一括登録・更新ができます。ヘッダ行は <code>code,label,color_code,sort_order,is_active,is_employed_state</code> の順で指定してください。
             </div>
             <div class="flex flex-col gap-3 md:flex-row md:items-center">
                 <a
@@ -70,6 +70,7 @@
                         <th class="px-4 py-2 text-left whitespace-nowrap">カラー</th>
                         <th class="px-4 py-2 text-left whitespace-nowrap">表示順</th>
                         <th class="px-4 py-2 text-left whitespace-nowrap">状態</th>
+                        <th class="px-4 py-2 text-left whitespace-nowrap">就業判定</th>
                         <th class="px-4 py-2 text-left whitespace-nowrap">最終更新</th>
                         <th class="px-4 py-2 text-left whitespace-nowrap">操作</th>
                     </tr>
@@ -95,6 +96,13 @@
                                     <span class="inline-flex items-center rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-600">停止中</span>
                                 @endif
                             </td>
+                            <td class="px-4 py-2 align-middle whitespace-nowrap">
+                                @if ($status->is_employed_state)
+                                    <span class="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">就業判定対象</span>
+                                @else
+                                    <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">通常</span>
+                                @endif
+                            </td>
                             <td class="px-4 py-2 align-middle whitespace-nowrap text-slate-700">{{ optional($status->updated_at)->format('Y/m/d H:i') }}</td>
                             <td class="px-4 py-2 align-middle whitespace-nowrap">
                                 <a href="{{ route('masters.candidate-statuses.edit', $status) }}" class="inline-flex items-center gap-1 rounded-full border border-blue-200 px-3 py-1 text-xs font-semibold text-blue-600 transition hover:bg-blue-50">
@@ -104,7 +112,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-4 py-6 text-center text-slate-500">登録済みのステータスがありません。</td>
+                            <td colspan="8" class="px-4 py-6 text-center text-slate-500">登録済みのステータスがありません。</td>
                         </tr>
                     @endforelse
                 </tbody>

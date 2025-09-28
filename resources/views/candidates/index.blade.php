@@ -1,5 +1,9 @@
 @extends('layouts.app')
 
+@php
+    $jobColumnWidthClass = 'w-72';
+@endphp
+
 @section('pageTitle', '紹介者一覧')
 @section('pageDescription', '未閲覧バッジ・見学スケジュール・ステータスをまとめて確認できます。検索条件は画面上部から絞り込み可能です。')
 
@@ -69,10 +73,10 @@
             </div>
 
             <div class="lg:col-span-2">
-                <label class="block text-sm font-semibold text-slate-700">見学確定日時</label>
+                <label class="block text-sm font-semibold text-slate-700">見学確定日</label>
                 <div class="mt-1 grid grid-cols-2 gap-2">
-                    <input type="datetime-local" name="interview_from" value="{{ $filters['interview_from'] }}" class="rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                    <input type="datetime-local" name="interview_to" value="{{ $filters['interview_to'] }}" class="rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                    <input type="date" name="interview_from" value="{{ $filters['interview_from'] }}" class="rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                    <input type="date" name="interview_to" value="{{ $filters['interview_to'] }}" class="rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
                 </div>
             </div>
 
@@ -130,8 +134,8 @@
                         <th class="p-4 text-left">閲覧</th>
                         <th class="p-4 text-left">氏名</th>
                         <th class="p-4 text-left">派遣会社</th>
-                        <th class="p-4 text-left w-64">希望職種</th>
-                        <th class="p-4 text-left">就業する職種</th>
+                        <th class="p-4 text-left {{ $jobColumnWidthClass }}">希望職種</th>
+                        <th class="p-4 text-left {{ $jobColumnWidthClass }}">就業する職種</th>
                         <th class="p-4 text-left">紹介日</th>
                         <th class="p-4 text-left">見学確定日時</th>
                         <th class="p-4 text-left whitespace-nowrap">ステータス</th>
@@ -169,8 +173,8 @@
                                 <div class="text-xs text-slate-500">ID: {{ str_pad((string) $candidate->id, 6, '0', STR_PAD_LEFT) }}</div>
                             </td>
                             <td class="p-4 text-slate-700">{{ optional($candidate->agency)->name ?? '未設定' }}</td>
-                            <td class="p-4 align-top">
-                                <div class="flex max-w-[18rem] flex-wrap gap-2 text-xs">
+                            <td class="p-4 align-top {{ $jobColumnWidthClass }}">
+                                <div class="flex flex-wrap gap-2 text-xs">
                                     @forelse ($jobPreferences as $index => $job)
                                         <span class="rounded-full bg-slate-100 px-3 py-1">{{ $job['label'] }}: {{ $job['value'] }}</span>
                                     @empty
@@ -178,7 +182,7 @@
                                     @endforelse
                                 </div>
                             </td>
-                            <td class="p-4 align-top text-slate-700" data-role="decided-job">
+                            <td class="p-4 align-top text-slate-700 {{ $jobColumnWidthClass }}" data-role="decided-job">
                                 @if (\App\Models\CandidateStatus::isEmployed((string) $candidate->status_code))
                                     <span class="inline-flex min-h-[2.25rem] items-center rounded-xl bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600">
                                         {{ optional($candidate->decidedJob)->name ?? '未設定' }}

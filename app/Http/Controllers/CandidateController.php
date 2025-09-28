@@ -87,14 +87,12 @@ class CandidateController extends Controller
             });
         }
 
-        if ($interviewFrom = $request->input('interview_from')) {
-            $from = Carbon::parse($interviewFrom);
-            $query->whereHas('confirmedInterview', fn ($inner) => $inner->where('scheduled_at', '>=', $from));
+        if ($interviewFrom = $request->date('interview_from')) {
+            $query->whereHas('confirmedInterview', fn ($inner) => $inner->whereDate('scheduled_at', '>=', $interviewFrom));
         }
 
-        if ($interviewTo = $request->input('interview_to')) {
-            $to = Carbon::parse($interviewTo);
-            $query->whereHas('confirmedInterview', fn ($inner) => $inner->where('scheduled_at', '<=', $to));
+        if ($interviewTo = $request->date('interview_to')) {
+            $query->whereHas('confirmedInterview', fn ($inner) => $inner->whereDate('scheduled_at', '<=', $interviewTo));
         }
 
         $remindState = (string) $request->string('remind_30m', 'all');

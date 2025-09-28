@@ -34,6 +34,7 @@ class CandidateStatusController extends Controller
                 'is_active' => true,
                 'sort_order' => 0,
                 'color_code' => '#E8F0FE',
+                'is_employed_state' => false,
             ]),
         ]);
     }
@@ -41,6 +42,7 @@ class CandidateStatusController extends Controller
     public function store(CandidateStatusRequest $request): RedirectResponse
     {
         CandidateStatus::create($request->validated());
+        CandidateStatus::refreshEmployedCache();
 
         return redirect()
             ->route('masters.candidate-statuses.index')
@@ -60,6 +62,7 @@ class CandidateStatusController extends Controller
         unset($data['code']);
 
         $candidateStatus->update($data);
+    CandidateStatus::refreshEmployedCache();
 
         return redirect()
             ->route('masters.candidate-statuses.index')
@@ -73,7 +76,7 @@ class CandidateStatusController extends Controller
         $callback = function () {
             $handle = fopen('php://output', 'wb');
 
-            fputcsv($handle, ['code', 'label', 'color_code', 'sort_order', 'is_active']);
+            fputcsv($handle, ['code', 'label', 'color_code', 'sort_order', 'is_active', 'is_employed_state']);
 
             CandidateStatus::query()
                 ->orderBy('sort_order')
@@ -86,6 +89,7 @@ class CandidateStatusController extends Controller
                             $status->color_code,
                             $status->sort_order,
                             $status->is_active ? 1 : 0,
+                            $status->is_employed_state ? 1 : 0,
                         ]);
                     }
                 });
@@ -107,7 +111,7 @@ class CandidateStatusController extends Controller
             return back()->withErrors(['file' => 'CSVファイルを開けませんでした。']);
         }
 
-        $expected = ['code', 'label', 'color_code', 'sort_order', 'is_active'];
+    $expected = ['code', 'label', 'color_code', 'sort_order', 'is_active', 'is_employed_state'];
         $header = fgetcsv($handle);
 
         if ($header === false) {
@@ -126,7 +130,7 @@ class CandidateStatusController extends Controller
             fclose($handle);
 
             return back()->withErrors([
-                'file' => 'CSVヘッダが一致しません。期待する順序: code,label,color_code,sort_order,is_active',
+                'file' => 'CSVヘッダが一致しません。期待する順序: code,label,color_code,sort_order,is_active,is_employed_state',
             ]);
         }
 
@@ -169,6 +173,7 @@ class CandidateStatusController extends Controller
                 'color_code' => $color,
                 'sort_order' => is_numeric($data['sort_order']) ? (int) $data['sort_order'] : 0,
                 'is_active' => $this->normalizeBoolean($data['is_active'], true),
+                'is_employed_state' => $this->normalizeBoolean($data['is_employed_state'], false),
             ];
         }
 
@@ -191,10 +196,13 @@ class CandidateStatusController extends Controller
                         'color_code' => $record['color_code'],
                         'sort_order' => $record['sort_order'],
                         'is_active' => $record['is_active'],
+                        'is_employed_state' => $record['is_employed_state'],
                     ]
                 );
             }
         });
+
+        CandidateStatus::refreshEmployedCache();
 
         return redirect()
             ->route('masters.candidate-statuses.index')

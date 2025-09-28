@@ -29,6 +29,7 @@ class CandidateStatusRequest extends FormRequest
             'color_code' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'sort_order' => ['integer', 'min:0', 'max:65535'],
             'is_active' => ['required', 'boolean'],
+            'is_employed_state' => ['required', 'boolean'],
         ];
     }
 
@@ -44,6 +45,7 @@ class CandidateStatusRequest extends FormRequest
             'color_code' => $color ? Str::upper($color) : null,
             'sort_order' => is_numeric($sortOrder) ? (int) $sortOrder : 0,
             'is_active' => $this->boolean('is_active'),
+            'is_employed_state' => $this->boolean('is_employed_state'),
         ]);
     }
 }

@@ -58,6 +58,7 @@ class MasterManagementTest extends TestCase
             'color_code' => '#E8F0FE',
             'sort_order' => 10,
             'is_active' => true,
+            'is_employed_state' => false,
         ]);
 
         $response = $this->actingAs($manager)->put(route('masters.candidate-statuses.update', $status), [
@@ -66,6 +67,7 @@ class MasterManagementTest extends TestCase
             'color_code' => '#ffcc00',
             'sort_order' => 5,
             'is_active' => 0,
+            'is_employed_state' => 1,
         ]);
 
         $response->assertRedirect(route('masters.candidate-statuses.index'));
@@ -75,6 +77,7 @@ class MasterManagementTest extends TestCase
             'color_code' => '#FFCC00',
             'sort_order' => 5,
             'is_active' => 0,
+            'is_employed_state' => 1,
         ]);
     }
 }

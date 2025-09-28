@@ -59,15 +59,28 @@
                     @enderror
                 </div>
 
-                <div>
-                    <input type="hidden" name="is_active" value="0">
-                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                        <input type="checkbox" name="is_active" value="1" @checked(old('is_active', true)) class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-                        利用中にする
-                    </label>
-                    @error('is_active')
-                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                    @enderror
+                <div class="space-y-3">
+                    <div>
+                        <input type="hidden" name="is_active" value="0">
+                        <label class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                            <input type="checkbox" name="is_active" value="1" @checked(old('is_active', true)) class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                            利用中にする
+                        </label>
+                        @error('is_active')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    <div>
+                        <input type="hidden" name="is_employed_state" value="0">
+                        <label class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                            <input type="checkbox" name="is_employed_state" value="1" @checked(old('is_employed_state', false)) class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                            就業判定対象にする
+                        </label>
+                        <p class="mt-1 text-xs text-slate-500">「就業する職種」の必須制御など、就業決定ステータスとして扱います。</p>
+                        @error('is_employed_state')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
                 </div>
             </div>
 

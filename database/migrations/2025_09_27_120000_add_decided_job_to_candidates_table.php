@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\CandidateStatus;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -19,9 +18,19 @@ return new class extends Migration
                 ->nullOnDelete();
         });
 
+        $employedCodes = DB::table('candidate_statuses')
+            ->select('code')
+            ->get()
+            ->pluck('code')
+            ->map(fn ($code) => mb_strtolower((string) $code))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
         DB::table('candidates')
-            ->when(CandidateStatus::employedCodes(), function ($query, $codes) {
-                return $query->whereIn(DB::raw('lower(status_code)'), $codes);
+            ->when(!empty($employedCodes), function ($query) use ($employedCodes) {
+                return $query->whereIn(DB::raw('lower(status_code)'), $employedCodes);
             })
             ->whereNull('decided_job_category_id')
             ->update(['decided_job_category_id' => DB::raw('wish_job1_id')]);
