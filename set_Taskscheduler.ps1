@@ -45,14 +45,47 @@ New-Item -ItemType Directory -Path $taskScriptDir -Force | Out-Null
 
 $scheduleScriptPath = Join-Path $taskScriptDir 'schedule-run.cmd'
 $workerScriptPath = Join-Path $taskScriptDir 'queue-worker.cmd'
+$scheduleLogPath = Join-Path $taskScriptDir 'schedule-run.log'
+$workerLogPath = Join-Path $taskScriptDir 'queue-worker.log'
 
 $cmdHeader = '@echo off'
 $changeDirLine = 'cd /d "{0}"' -f $ProjectRoot
 $scheduleBody = '"{0}" artisan schedule:run' -f $PhpPath
 $workerBody = '"{0}" artisan queue:work database --queue=reminders,default --sleep=5 --tries=3 --max-time=3600' -f $PhpPath
 
-Set-Content -Path $scheduleScriptPath -Value @($cmdHeader, $changeDirLine, $scheduleBody) -Encoding ASCII
-Set-Content -Path $workerScriptPath -Value @($cmdHeader, $changeDirLine, $workerBody) -Encoding ASCII
+$scheduleLogStart = 'powershell -NoProfile -Command "Add-Content -Path ''{0}'' -Value ((Get-Date -Format ''yyyy-MM-dd HH:mm:ss'') + '' [schedule:run] triggered'')"' -f $scheduleLogPath
+$scheduleLogEnd = 'powershell -NoProfile -Command "Add-Content -Path ''{0}'' -Value ((Get-Date -Format ''yyyy-MM-dd HH:mm:ss'') + '' [schedule:run] exited with code %EXITCODE%'')"' -f $scheduleLogPath
+$workerLogStart = 'powershell -NoProfile -Command "Add-Content -Path ''{0}'' -Value ((Get-Date -Format ''yyyy-MM-dd HH:mm:ss'') + '' [queue:work] started'')"' -f $workerLogPath
+$workerLogEnd = 'powershell -NoProfile -Command "Add-Content -Path ''{0}'' -Value ((Get-Date -Format ''yyyy-MM-dd HH:mm:ss'') + '' [queue:work] exited with code %EXITCODE%'')"' -f $workerLogPath
+
+$scheduleScriptLines = @(
+	$cmdHeader,
+	'setlocal',
+	('set "LOG_FILE={0}"' -f $scheduleLogPath),
+	'if not exist "%LOG_FILE%" (type nul > "%LOG_FILE%")',
+	$scheduleLogStart,
+	$changeDirLine,
+	($scheduleBody + ' >> "%LOG_FILE%" 2>&1'),
+	'set "EXITCODE=%ERRORLEVEL%"',
+	$scheduleLogEnd,
+	'exit /b %EXITCODE%'
+)
+
+$workerScriptLines = @(
+	$cmdHeader,
+	'setlocal',
+	('set "LOG_FILE={0}"' -f $workerLogPath),
+	'if not exist "%LOG_FILE%" (type nul > "%LOG_FILE%")',
+	$workerLogStart,
+	$changeDirLine,
+	($workerBody + ' >> "%LOG_FILE%" 2>&1'),
+	'set "EXITCODE=%ERRORLEVEL%"',
+	$workerLogEnd,
+	'exit /b %EXITCODE%'
+)
+
+Set-Content -Path $scheduleScriptPath -Value $scheduleScriptLines -Encoding ASCII
+Set-Content -Path $workerScriptPath -Value $workerScriptLines -Encoding ASCII
 $scheduleCommand = '"' + ($scheduleScriptPath -replace '"', '""') + '"'
 $workerCommand = '"' + ($workerScriptPath -replace '"', '""') + '"'
 
