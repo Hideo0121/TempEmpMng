@@ -65,7 +65,7 @@ class InterviewReminderService
         $scheduled = $interview->scheduled_at;
 
         if ($scheduled instanceof CarbonInterface) {
-            return CarbonImmutable::parse($scheduled->format('Y-m-d H:i:s'), $timezone);
+            return CarbonImmutable::createFromInterface($scheduled)->setTimezone($timezone);
         }
 
         if ($scheduled === null) {

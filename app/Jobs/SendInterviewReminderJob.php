@@ -24,6 +24,12 @@ class SendInterviewReminderJob implements ShouldQueue
     use SerializesModels;
     use Batchable;
 
+    public function __construct()
+    {
+        $this->connection = config('queue.default');
+        $this->queue = 'reminders';
+    }
+
     /**
      * Execute the job.
      */
@@ -106,14 +112,24 @@ class SendInterviewReminderJob implements ShouldQueue
     {
         $candidate = $interview->candidate;
 
-        return $candidate->handlerCollection()
+        $addresses = $candidate->handlerCollection()
             ->pluck('email')
             ->when(optional($candidate->agency)->email, fn ($collection, $email) => $collection->push($email))
             ->filter()
             ->map(fn ($email) => trim($email))
+            ->filter()
             ->unique()
-            ->values()
-            ->all();
+            ->values();
+
+        if ($addresses->isEmpty()) {
+            $ownerEmail = optional($candidate->createdBy)->email;
+
+            if ($ownerEmail) {
+                $addresses->push(trim($ownerEmail));
+            }
+        }
+
+        return $addresses->unique()->values()->all();
     }
 
     protected function buildCcAddresses(Interview $interview): array

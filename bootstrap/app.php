@@ -15,6 +15,14 @@ return Application::configure(basePath: dirname(__DIR__))
             'manager' => \App\Http\Middleware\EnsureUserIsManager::class,
         ]);
     })
+    ->withSchedule(function (Illuminate\Console\Scheduling\Schedule $schedule) {
+        $schedule->call(function () {
+            \App\Jobs\SendInterviewReminderJob::dispatch()
+                ->onConnection(config('queue.default'))
+                ->onQueue('reminders');
+        })->everyFiveMinutes()
+            ->name('dispatch-interview-reminders');
+    })
     ->withExceptions(function (Exceptions $exceptions) {
         //
     })->create();

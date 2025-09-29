@@ -7,7 +7,6 @@
 - 候補者: **{{ $candidate->name }}**（{{ $candidate->name_kana }}）
 - 派遣会社: {{ optional($agency)->name ?? '未設定' }}
 - 見学日時: {{ $scheduledAt->format('Y/m/d H:i') }} （{{ $timezone }}）
-- 見学場所: {{ $place ?? '未設定' }}
 @endcomponent
 
 ## 対応者
@@ -28,8 +27,6 @@
 > ※ 30分前リマインドは現在停止設定になっています。手動での確認をお願いします。
 @endif
 
-何かございましたら受入管理チームまでご連絡ください。
-
 よろしくお願いいたします。
-受入管理チーム
+
 @endcomponent
