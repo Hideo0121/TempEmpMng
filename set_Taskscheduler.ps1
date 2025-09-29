@@ -1,10 +1,61 @@
 #Requires -RunAsAdministrator
 
 param(
-	[string]$ProjectRoot = 'C:\xampp\htdocs\TempEmpMng',
-	[string]$PhpPath = 'C:\xampp\php\php.exe',
-	[string]$TaskPrefix = 'TempEmpMng'
+	[string]$ProjectRoot,
+	[string]$PhpPath,
+	[string]$TaskPrefix = 'TempEmpMng',
+	[ValidateSet('Development', 'Production')]
+	[string]$Environment
 )
+
+$environmentConfigs = @{
+	'Development' = [pscustomobject]@{
+		ProjectRoot = 'C:\xampp\htdocs\TempEmpMng'
+		PhpPath     = 'C:\xampp\php\php.exe'
+	}
+	'Production' = [pscustomobject]@{
+		ProjectRoot = 'C:\inetpub\wwwroot\TempEmpMng'
+		PhpPath     = 'C:\php\php.exe'
+	}
+}
+
+if (-not $Environment) {
+	Write-Host 'どの環境のタスクを設定しますか？'
+	Write-Host '[1] 開発環境 (C:\xampp\htdocs\TempEmpMng / C:\xampp\php\php.exe)'
+	Write-Host '[2] 本番環境 (C:\inetpub\wwwroot\TempEmpMng / C:\php\php.exe)'
+	while (-not $Environment) {
+		$input = Read-Host '番号または環境名を入力してください (既定: 1)'
+		if ([string]::IsNullOrWhiteSpace($input)) {
+			$Environment = 'Development'
+			break
+		}
+		switch ($input.Trim()) {
+			'1' { $Environment = 'Development' }
+			'2' { $Environment = 'Production' }
+			{ $_.Equals('Development', [StringComparison]::OrdinalIgnoreCase) } { $Environment = 'Development' }
+			{ $_.Equals('Production', [StringComparison]::OrdinalIgnoreCase) } { $Environment = 'Production' }
+			default { Write-Warning '入力が正しくありません。1 または 2 を指定してください。' }
+		}
+	}
+}
+
+$selectedEnvironment = $environmentConfigs[$Environment]
+
+if (-not $selectedEnvironment) {
+	throw "Environment '$Environment' はサポートされていません。"
+}
+
+if (-not $ProjectRoot) {
+	$ProjectRoot = $selectedEnvironment.ProjectRoot
+}
+
+if (-not $PhpPath) {
+	$PhpPath = $selectedEnvironment.PhpPath
+}
+
+Write-Host "環境: $Environment"
+Write-Host "ProjectRoot: $ProjectRoot"
+Write-Host "PHP Path: $PhpPath"
 
 function Invoke-Schtasks {
 	param(
