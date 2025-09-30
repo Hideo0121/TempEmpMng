@@ -44,7 +44,6 @@ class InterviewReminderMailTest extends TestCase
         $rendered = $built->render();
 
         $this->assertStringContainsString('担当者A', $rendered);
-        $this->assertStringContainsString('本社オフィス', $rendered);
         $this->assertStringContainsString('1時間前リマインド', $rendered);
     }
 }

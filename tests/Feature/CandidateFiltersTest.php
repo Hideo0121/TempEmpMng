@@ -288,4 +288,22 @@ class CandidateFiltersTest extends TestCase
             'decided_job_category_id' => $jobA->id,
         ]);
     }
+
+    public function test_can_sort_candidates_by_name(): void
+    {
+        $user = User::factory()->create();
+        ['agency' => $agency, 'status' => $status, 'jobA' => $jobA] = $this->seedLookups();
+
+        $this->createCandidate($user, $agency, $status, $jobA, 'Chris Carter');
+        $this->createCandidate($user, $agency, $status, $jobA, 'Adam Adams');
+        $this->createCandidate($user, $agency, $status, $jobA, 'Bella Barnes');
+
+        $responseAsc = $this->actingAs($user)->get(route('candidates.index', ['sort' => 'name', 'direction' => 'asc']));
+        $responseAsc->assertOk();
+        $responseAsc->assertSeeInOrder(['Adam Adams', 'Bella Barnes', 'Chris Carter']);
+
+        $responseDesc = $this->actingAs($user)->get(route('candidates.index', ['sort' => 'name', 'direction' => 'desc']));
+        $responseDesc->assertOk();
+        $responseDesc->assertSeeInOrder(['Chris Carter', 'Bella Barnes', 'Adam Adams']);
+    }
 }

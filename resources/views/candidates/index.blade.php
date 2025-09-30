@@ -2,6 +2,52 @@
 
 @php
     $jobColumnWidthClass = 'w-72';
+    $currentSort = $currentSort ?? null;
+    $currentDirection = $currentDirection ?? null;
+    $sortDefaults = [
+        'viewed' => 'asc',
+        'name' => 'asc',
+        'agency' => 'asc',
+        'wish_job' => 'asc',
+        'decided_job' => 'asc',
+        'introduced_on' => 'desc',
+        'interview_at' => 'asc',
+        'status' => 'asc',
+        'status_changed_on' => 'desc',
+    ];
+    $sortLabels = [
+        'viewed' => '閲覧状態',
+        'name' => '氏名',
+        'agency' => '派遣会社',
+        'wish_job' => '希望職種',
+        'decided_job' => '就業する職種',
+        'introduced_on' => '紹介日',
+        'interview_at' => '見学確定日時',
+        'status' => 'ステータス',
+        'status_changed_on' => '状態変化日',
+    ];
+    $sortUrl = function (string $column) use ($currentSort, $currentDirection, $sortDefaults) {
+        $isCurrent = $currentSort === $column;
+        $nextDirection = $isCurrent
+            ? ($currentDirection === 'asc' ? 'desc' : 'asc')
+            : ($sortDefaults[$column] ?? 'asc');
+
+        return request()->fullUrlWithQuery([
+            'sort' => $column,
+            'direction' => $nextDirection,
+            'page' => null,
+        ]);
+    };
+    $ariaSort = function (string $column) use ($currentSort, $currentDirection) {
+        if ($currentSort !== $column) {
+            return 'none';
+        }
+
+        return $currentDirection === 'asc' ? 'ascending' : 'descending';
+    };
+    $sortDescription = $currentSort
+        ? sprintf('%s（%s）', $sortLabels[$currentSort] ?? $currentSort, $currentDirection === 'asc' ? '昇順' : '降順')
+        : '未閲覧優先 → 紹介日降順（既定）';
 @endphp
 
 @section('pageTitle', '紹介者一覧')
@@ -109,8 +155,10 @@
             </div>
 
             <div class="lg:col-span-12 flex flex-wrap items-center justify-end gap-3 pt-2">
+                <input type="hidden" name="sort" value="{{ $currentSort ?? '' }}">
+                <input type="hidden" name="direction" value="{{ $currentDirection ?? '' }}">
                 <button type="button" data-filter-clear="{{ route('candidates.index') }}" class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">クリア</button>
-                <button type="submit" class="rounded-xl bg-blue-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-blue-500">検索</button>
+                <button type="submit" class="rounded-xl bg-blue-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-blue-500" data-reset-sort>検索</button>
             </div>
         </form>
     </section>
@@ -118,12 +166,11 @@
     <section class="rounded-3xl bg-white shadow-md">
         <header class="flex items-center justify-between border-b border-slate-200 px-6 py-4">
             <div class="flex items-center gap-3 text-sm text-slate-600">
-                <span>未閲覧優先 → 紹介日降順（既定）</span>
-                <button class="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-100">並び替えを変更</button>
+                <span>{{ $sortDescription }}</span>
             </div>
             <div class="flex items-center gap-3 text-sm">
-                <button class="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600 transition hover:bg-slate-200">CSVエクスポート</button>
-                <button class="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600 transition hover:bg-slate-200">カラム設定</button>
+                <a href="{{ route('candidates.export', request()->query()) }}"
+                    class="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600 transition hover:bg-slate-200">CSVエクスポート</a>
             </div>
         </header>
 
@@ -131,16 +178,115 @@
             <table class="min-w-[1500px] w-full divide-y divide-slate-200">
                 <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                     <tr>
-                        <th class="p-4 text-left">閲覧</th>
-                        <th class="p-4 text-left">氏名</th>
-                        <th class="p-4 text-left">派遣会社</th>
-                        <th class="p-4 text-left {{ $jobColumnWidthClass }}">希望職種</th>
-                        <th class="p-4 text-left {{ $jobColumnWidthClass }}">就業する職種</th>
-                        <th class="p-4 text-left">紹介日</th>
-                        <th class="p-4 text-left">見学確定日時</th>
-                        <th class="p-4 text-left whitespace-nowrap">ステータス</th>
-                        <th class="p-4 text-left">状態変化日</th>
-                        <th class="p-4 text-left">アクション</th>
+                        <th class="p-4 text-left" aria-sort="{{ $ariaSort('viewed') }}">
+                            <a href="{{ $sortUrl('viewed') }}" class="group inline-flex items-center gap-1 font-semibold text-slate-600 transition hover:text-blue-600">
+                                <span>閲覧</span>
+                                <span aria-hidden="true" class="text-[0.7rem] text-slate-300 group-hover:text-slate-400">
+                                    @if ($currentSort === 'viewed')
+                                        {{ $currentDirection === 'asc' ? '▲' : '▼' }}
+                                    @else
+                                        ↕
+                                    @endif
+                                </span>
+                            </a>
+                        </th>
+                        <th class="p-4 text-left" aria-sort="{{ $ariaSort('name') }}">
+                            <a href="{{ $sortUrl('name') }}" class="group inline-flex items-center gap-1 font-semibold text-slate-600 transition hover:text-blue-600">
+                                <span>氏名</span>
+                                <span aria-hidden="true" class="text-[0.7rem] text-slate-300 group-hover:text-slate-400">
+                                    @if ($currentSort === 'name')
+                                        {{ $currentDirection === 'asc' ? '▲' : '▼' }}
+                                    @else
+                                        ↕
+                                    @endif
+                                </span>
+                            </a>
+                        </th>
+                        <th class="p-4 text-left" aria-sort="{{ $ariaSort('agency') }}">
+                            <a href="{{ $sortUrl('agency') }}" class="group inline-flex items-center gap-1 font-semibold text-slate-600 transition hover:text-blue-600">
+                                <span>派遣会社</span>
+                                <span aria-hidden="true" class="text-[0.7rem] text-slate-300 group-hover:text-slate-400">
+                                    @if ($currentSort === 'agency')
+                                        {{ $currentDirection === 'asc' ? '▲' : '▼' }}
+                                    @else
+                                        ↕
+                                    @endif
+                                </span>
+                            </a>
+                        </th>
+                        <th class="p-4 text-left {{ $jobColumnWidthClass }}" aria-sort="{{ $ariaSort('wish_job') }}">
+                            <a href="{{ $sortUrl('wish_job') }}" class="group inline-flex items-center gap-1 font-semibold text-slate-600 transition hover:text-blue-600">
+                                <span>希望職種</span>
+                                <span aria-hidden="true" class="text-[0.7rem] text-slate-300 group-hover:text-slate-400">
+                                    @if ($currentSort === 'wish_job')
+                                        {{ $currentDirection === 'asc' ? '▲' : '▼' }}
+                                    @else
+                                        ↕
+                                    @endif
+                                </span>
+                            </a>
+                        </th>
+                        <th class="p-4 text-left {{ $jobColumnWidthClass }}" aria-sort="{{ $ariaSort('decided_job') }}">
+                            <a href="{{ $sortUrl('decided_job') }}" class="group inline-flex items-center gap-1 font-semibold text-slate-600 transition hover:text-blue-600">
+                                <span>就業する職種</span>
+                                <span aria-hidden="true" class="text-[0.7rem] text-slate-300 group-hover:text-slate-400">
+                                    @if ($currentSort === 'decided_job')
+                                        {{ $currentDirection === 'asc' ? '▲' : '▼' }}
+                                    @else
+                                        ↕
+                                    @endif
+                                </span>
+                            </a>
+                        </th>
+                        <th class="p-4 text-left" aria-sort="{{ $ariaSort('introduced_on') }}">
+                            <a href="{{ $sortUrl('introduced_on') }}" class="group inline-flex items-center gap-1 font-semibold text-slate-600 transition hover:text-blue-600">
+                                <span>紹介日</span>
+                                <span aria-hidden="true" class="text-[0.7rem] text-slate-300 group-hover:text-slate-400">
+                                    @if ($currentSort === 'introduced_on')
+                                        {{ $currentDirection === 'asc' ? '▲' : '▼' }}
+                                    @else
+                                        ↕
+                                    @endif
+                                </span>
+                            </a>
+                        </th>
+                        <th class="p-4 text-left" aria-sort="{{ $ariaSort('interview_at') }}">
+                            <a href="{{ $sortUrl('interview_at') }}" class="group inline-flex items-center gap-1 font-semibold text-slate-600 transition hover:text-blue-600">
+                                <span>見学確定日時</span>
+                                <span aria-hidden="true" class="text-[0.7rem] text-slate-300 group-hover:text-slate-400">
+                                    @if ($currentSort === 'interview_at')
+                                        {{ $currentDirection === 'asc' ? '▲' : '▼' }}
+                                    @else
+                                        ↕
+                                    @endif
+                                </span>
+                            </a>
+                        </th>
+                        <th class="p-4 text-left whitespace-nowrap" aria-sort="{{ $ariaSort('status') }}">
+                            <a href="{{ $sortUrl('status') }}" class="group inline-flex items-center gap-1 font-semibold text-slate-600 transition hover:text-blue-600">
+                                <span>ステータス</span>
+                                <span aria-hidden="true" class="text-[0.7rem] text-slate-300 group-hover:text-slate-400">
+                                    @if ($currentSort === 'status')
+                                        {{ $currentDirection === 'asc' ? '▲' : '▼' }}
+                                    @else
+                                        ↕
+                                    @endif
+                                </span>
+                            </a>
+                        </th>
+                        <th class="p-4 text-left" aria-sort="{{ $ariaSort('status_changed_on') }}">
+                            <a href="{{ $sortUrl('status_changed_on') }}" class="group inline-flex items-center gap-1 font-semibold text-slate-600 transition hover:text-blue-600">
+                                <span>状態変化日</span>
+                                <span aria-hidden="true" class="text-[0.7rem] text-slate-300 group-hover:text-slate-400">
+                                    @if ($currentSort === 'status_changed_on')
+                                        {{ $currentDirection === 'asc' ? '▲' : '▼' }}
+                                    @else
+                                        ↕
+                                    @endif
+                                </span>
+                            </a>
+                        </th>
+                        <th class="p-4 text-left" aria-sort="none">アクション</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 bg-white text-sm">
@@ -288,6 +434,17 @@
                     if (url) {
                         window.location.href = url;
                     }
+                });
+            }
+
+            const sortInput = document.querySelector('input[name="sort"]');
+            const directionInput = document.querySelector('input[name="direction"]');
+            const searchButton = document.querySelector('[data-reset-sort]');
+
+            if (searchButton && sortInput && directionInput) {
+                searchButton.addEventListener('click', () => {
+                    sortInput.value = '';
+                    directionInput.value = '';
                 });
             }
 

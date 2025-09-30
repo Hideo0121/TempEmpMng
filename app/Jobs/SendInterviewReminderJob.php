@@ -1,12 +1,5 @@
 <?php
 
-Log::info('Queueing interview reminder', [
-    'interview_id' => $interview->id,
-    'slot' => $slot,
-    'to' => $to,
-    'cc' => $cc,
-]);
-
 namespace App\Jobs;
 
 use App\Mail\InterviewReminderMail;
@@ -53,6 +46,13 @@ class SendInterviewReminderJob implements ShouldQueue
     {
         $to = $this->buildToAddresses($interview);
         $cc = $this->buildCcAddresses($interview);
+
+        Log::info('Queueing interview reminder', [
+            'interview_id' => $interview->id,
+            'slot' => $slot,
+            'to' => $to,
+            'cc' => $cc,
+        ]);
 
         $notification = Notification::create([
             'type' => 'interview_reminder',

@@ -16,6 +16,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -26,7 +27,124 @@ class CandidateController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+        $remindState = (string) $request->string('remind_30m', 'all');
+        $viewState = (string) $request->string('view_state', 'all');
+        [$sortKey, $sortDirection] = $this->parseSort($request);
 
+        $candidates = $this->filteredCandidatesQuery($request, $user, $sortKey, $sortDirection)
+            ->paginate(10)
+            ->withQueryString();
+
+        $agencies = Agency::query()->orderBy('name')->get();
+        $statuses = CandidateStatus::query()->orderBy('sort_order')->get();
+        $handlers = User::query()->where('is_active', true)->orderBy('name')->get();
+        $jobCategories = JobCategory::query()->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get();
+        $employedStatusCodes = CandidateStatus::employedCodes();
+
+        return view('candidates.index', [
+            'candidates' => $candidates,
+            'agencies' => $agencies,
+            'statuses' => $statuses,
+            'handlers' => $handlers,
+            'jobCategories' => $jobCategories,
+            'employedStatusCodes' => $employedStatusCodes,
+            'filters' => [
+                'keyword' => $request->input('keyword'),
+                'agency' => $request->input('agency'),
+                'wish_job' => $request->input('wish_job'),
+                'decided_job' => $request->input('decided_job'),
+                'status' => (array) $request->input('status', []),
+                'introduced_from' => $request->input('introduced_from'),
+                'introduced_to' => $request->input('introduced_to'),
+                'interview_from' => $request->input('interview_from'),
+                'interview_to' => $request->input('interview_to'),
+                'handler' => $request->input('handler'),
+                'remind_30m' => $remindState,
+                'view_state' => $viewState,
+            ],
+            'currentSort' => $sortKey,
+            'currentDirection' => $sortDirection,
+        ]);
+    }
+
+    public function export(Request $request)
+    {
+        $user = $request->user();
+        $fileName = 'candidates_' . now()->format('Ymd_His') . '.csv';
+
+        [$sortKey, $sortDirection] = $this->parseSort($request);
+
+        $query = $this->filteredCandidatesQuery($request, $user, $sortKey, $sortDirection);
+
+        return response()->streamDownload(function () use ($query, $user) {
+            $handle = fopen('php://output', 'w');
+
+            if ($handle === false) {
+                throw new \RuntimeException('Failed to open output stream for CSV export.');
+            }
+
+            $encode = static fn ($value) => mb_convert_encoding($value, 'SJIS-win', 'UTF-8');
+            $headers = [
+                'ID',
+                '氏名',
+                '氏名（カナ）',
+                '派遣会社',
+                '第1希望職種',
+                '第2希望職種',
+                '第3希望職種',
+                '就業する職種',
+                '紹介日',
+                '見学確定日時',
+                'ステータス',
+                '状態変化日',
+                '対応者1',
+                '対応者2',
+                '閲覧状態',
+                '30分前リマインド',
+            ];
+
+            fputcsv($handle, array_map($encode, $headers));
+
+            $query->chunk(200, function ($candidates) use ($handle, $user, $encode) {
+                foreach ($candidates as $candidate) {
+                    $confirmedInterview = $candidate->confirmedInterview;
+                    $viewRecord = $user ? $candidate->views->first() : null;
+
+                    $row = [
+                        str_pad((string) $candidate->id, 6, '0', STR_PAD_LEFT),
+                        $candidate->name ?? '',
+                        $candidate->name_kana ?? '',
+                        optional($candidate->agency)->name ?? '',
+                        optional($candidate->wishJob1)->name ?? '',
+                        optional($candidate->wishJob2)->name ?? '',
+                        optional($candidate->wishJob3)->name ?? '',
+                        optional($candidate->decidedJob)->name ?? '',
+                        optional($candidate->introduced_on)->format('Y/m/d') ?? '',
+                        optional(optional($confirmedInterview)->scheduled_at)->format('Y/m/d H:i') ?? '',
+                        optional($candidate->status)->label ?? '',
+                        optional($candidate->status_changed_on)->format('Y/m/d') ?? '',
+                        optional($candidate->handler1)->name ?? '',
+                        optional($candidate->handler2)->name ?? '',
+                        $viewRecord ? '閲覧済' : '未閲覧',
+                        match ($confirmedInterview?->remind_30m_enabled) {
+                            true => 'ON',
+                            false => 'OFF',
+                            default => '未設定',
+                        },
+                    ];
+
+                    fputcsv($handle, array_map($encode, array_map(static fn ($value) => $value ?? '', $row)));
+                }
+            });
+
+            fclose($handle);
+        }, $fileName, [
+            'Content-Type' => 'text/csv; charset=Shift_JIS',
+        ]);
+    }
+
+    protected function filteredCandidatesQuery(Request $request, ?User $user, ?string $sort = null, ?string $direction = null): Builder
+    {
         $query = Candidate::query()
             ->with([
                 'agency',
@@ -41,7 +159,13 @@ class CandidateController extends Controller
                 'views' => fn ($q) => $user ? $q->where('user_id', $user->id) : $q->whereRaw('1 = 0'),
             ]);
 
-    if ($keyword = (string) $request->string('keyword')->trim()) {
+        if ($user) {
+            $query->withCount([
+                'views as user_viewed' => fn ($q) => $q->where('user_id', $user->id),
+            ]);
+        }
+
+        if ($keyword = (string) $request->string('keyword')->trim()) {
             $query->where(function ($inner) use ($keyword) {
                 $inner->where('name', 'like', "%{$keyword}%")
                     ->orWhere('name_kana', 'like', "%{$keyword}%")
@@ -65,11 +189,9 @@ class CandidateController extends Controller
             $query->where('decided_job_category_id', $decidedJobId);
         }
 
-        if ($statuses = $request->input('status', [])) {
-            $statuses = array_filter((array) $statuses);
-            if (!empty($statuses)) {
-                $query->whereIn('status_code', $statuses);
-            }
+        $statuses = array_filter((array) $request->input('status', []));
+        if (!empty($statuses)) {
+            $query->whereIn('status_code', $statuses);
         }
 
         if ($introducedFrom = $request->date('introduced_from')) {
@@ -106,7 +228,7 @@ class CandidateController extends Controller
             $query->whereHas('confirmedInterview', fn ($inner) => $inner->where('remind_30m_enabled', false));
         }
 
-    $viewState = (string) $request->string('view_state', 'all');
+        $viewState = (string) $request->string('view_state', 'all');
 
         if ($user) {
             if ($viewState === 'unread') {
@@ -116,38 +238,113 @@ class CandidateController extends Controller
             }
         }
 
-        $candidates = $query->orderByDesc('introduced_on')
-            ->paginate(10)
-            ->withQueryString();
+        $this->applySorting($query, $sort, $direction, $user);
 
-        $agencies = Agency::query()->orderBy('name')->get();
-        $statuses = CandidateStatus::query()->orderBy('sort_order')->get();
-        $handlers = User::query()->where('is_active', true)->orderBy('name')->get();
-        $jobCategories = JobCategory::query()->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get();
-        $employedStatusCodes = CandidateStatus::employedCodes();
+        return $query;
+    }
 
-        return view('candidates.index', [
-            'candidates' => $candidates,
-            'agencies' => $agencies,
-            'statuses' => $statuses,
-            'handlers' => $handlers,
-            'jobCategories' => $jobCategories,
-            'employedStatusCodes' => $employedStatusCodes,
-            'filters' => [
-                'keyword' => $request->input('keyword'),
-                'agency' => $request->input('agency'),
-                'wish_job' => $request->input('wish_job'),
-                'decided_job' => $request->input('decided_job'),
-                'status' => (array) $request->input('status', []),
-                'introduced_from' => $request->input('introduced_from'),
-                'introduced_to' => $request->input('introduced_to'),
-                'interview_from' => $request->input('interview_from'),
-                'interview_to' => $request->input('interview_to'),
-                'handler' => $request->input('handler'),
-                'remind_30m' => $remindState,
-                'view_state' => $viewState,
-            ],
-        ]);
+    protected function parseSort(Request $request): array
+    {
+        $sort = (string) $request->query('sort', '');
+        $direction = strtolower((string) $request->query('direction', ''));
+
+        $allowed = [
+            'viewed' => 'asc',
+            'name' => 'asc',
+            'agency' => 'asc',
+            'wish_job' => 'asc',
+            'decided_job' => 'asc',
+            'introduced_on' => 'desc',
+            'interview_at' => 'asc',
+            'status' => 'asc',
+            'status_changed_on' => 'desc',
+        ];
+
+        if (!array_key_exists($sort, $allowed)) {
+            return [null, null];
+        }
+
+        if (!in_array($direction, ['asc', 'desc'], true)) {
+            $direction = $allowed[$sort];
+        }
+
+        return [$sort, $direction];
+    }
+
+    protected function applySorting(Builder $query, ?string $sort, ?string $direction, ?User $user): void
+    {
+        $direction = in_array($direction, ['asc', 'desc'], true) ? $direction : null;
+
+        if (!$sort) {
+            if ($user) {
+                $query->orderBy('user_viewed');
+            }
+
+            $query->orderByDesc('introduced_on');
+            $query->orderByDesc('id');
+
+            return;
+        }
+
+        $direction = $direction ?? 'asc';
+
+        switch ($sort) {
+            case 'viewed':
+                if ($user) {
+                    $query->orderBy('user_viewed', $direction);
+                }
+                break;
+            case 'name':
+                $query->orderBy('name', $direction);
+                break;
+            case 'agency':
+                $query->orderBy(
+                    Agency::select('name')->whereColumn('agencies.id', 'candidates.agency_id'),
+                    $direction
+                );
+                break;
+            case 'wish_job':
+                $query->orderBy(
+                    JobCategory::select('name')->whereColumn('job_categories.id', 'candidates.wish_job1_id'),
+                    $direction
+                );
+                break;
+            case 'decided_job':
+                $query->orderBy(
+                    JobCategory::select('name')->whereColumn('job_categories.id', 'candidates.decided_job_category_id'),
+                    $direction
+                );
+                break;
+            case 'introduced_on':
+                $query->orderBy('introduced_on', $direction);
+                break;
+            case 'interview_at':
+                $query->orderBy(
+                    Interview::select('scheduled_at')
+                        ->whereColumn('interviews.candidate_id', 'candidates.id')
+                        ->orderByDesc('scheduled_at')
+                        ->limit(1),
+                    $direction
+                );
+                break;
+            case 'status':
+                $query->orderBy(
+                    CandidateStatus::select('label')->whereColumn('candidate_statuses.code', 'candidates.status_code'),
+                    $direction
+                );
+                break;
+            case 'status_changed_on':
+                $query->orderBy('status_changed_on', $direction);
+                break;
+            default:
+                if ($user) {
+                    $query->orderBy('user_viewed');
+                }
+                $query->orderByDesc('introduced_on');
+                break;
+        }
+
+        $query->orderByDesc('id');
     }
 
     public function create(): View
