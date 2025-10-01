@@ -48,6 +48,9 @@
     $sortDescription = $currentSort
         ? sprintf('%s（%s）', $sortLabels[$currentSort] ?? $currentSort, $currentDirection === 'asc' ? '昇順' : '降順')
         : '未閲覧優先 → 紹介日降順（既定）';
+    $perPageOptions = $perPageOptions ?? [10, 25, 50, 100];
+    $currentPerPage = (int) ($filters['per_page'] ?? ($perPageOptions[0] ?? 10));
+    $namesUrl = route('candidates.names', collect(request()->query())->except('page')->all());
 @endphp
 
 @section('pageTitle', '紹介者一覧')
@@ -157,6 +160,14 @@
             <div class="lg:col-span-12 flex flex-wrap items-center justify-end gap-3 pt-2">
                 <input type="hidden" name="sort" value="{{ $currentSort ?? '' }}">
                 <input type="hidden" name="direction" value="{{ $currentDirection ?? '' }}">
+                <label class="flex items-center gap-2 text-sm font-semibold text-slate-600">
+                    <span>表示件数</span>
+                    <select name="per_page" data-per-page-select class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                        @foreach ($perPageOptions as $option)
+                            <option value="{{ $option }}" @selected((int) $currentPerPage === (int) $option)>{{ $option }}</option>
+                        @endforeach
+                    </select>
+                </label>
                 <button type="button" data-filter-clear="{{ route('candidates.index') }}" class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">クリア</button>
                 <button type="submit" class="rounded-xl bg-blue-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-blue-500" data-reset-sort>検索</button>
             </div>
@@ -169,7 +180,7 @@
                 <span>{{ $sortDescription }}</span>
             </div>
             <div class="flex items-center gap-3 text-sm">
-                <button type="button" class="rounded-full border border-blue-200 px-3 py-1 font-semibold text-blue-600 transition hover:bg-blue-50" data-copy-names>氏名コピー</button>
+                <button type="button" class="rounded-full border border-blue-200 px-3 py-1 font-semibold text-blue-600 transition hover:bg-blue-50" data-copy-names data-copy-names-url="{{ $namesUrl }}">氏名コピー</button>
                 <a href="{{ route('candidates.export', request()->query()) }}"
                     class="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600 transition hover:bg-slate-200">CSVエクスポート</a>
             </div>
@@ -449,6 +460,16 @@
                 });
             }
 
+            const perPageSelect = document.querySelector('[data-per-page-select]');
+            if (perPageSelect) {
+                perPageSelect.addEventListener('change', () => {
+                    const form = perPageSelect.closest('form');
+                    if (form) {
+                        form.requestSubmit();
+                    }
+                });
+            }
+
             const copyNamesButton = document.querySelector('[data-copy-names]');
             if (copyNamesButton) {
                 const originalLabel = copyNamesButton.textContent.trim();
@@ -501,10 +522,38 @@
                 };
 
                 copyNamesButton.addEventListener('click', async () => {
-                    const rows = Array.from(document.querySelectorAll('[data-candidate-row][data-candidate-name]'));
-                    const names = rows
-                        .map((row) => (row.dataset.candidateName || '').trim())
-                        .filter((name) => name.length > 0);
+                    const namesUrl = copyNamesButton.dataset.copyNamesUrl || '';
+
+                    if (!namesUrl) {
+                        showFeedback('コピーに失敗しました', true);
+                        return;
+                    }
+
+                    copyNamesButton.disabled = true;
+
+                    let names = [];
+
+                    try {
+                        const response = await fetch(namesUrl, {
+                            headers: {
+                                'Accept': 'application/json',
+                            },
+                            credentials: 'same-origin',
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Request failed');
+                        }
+
+                        const payload = await response.json();
+                        const fetchedNames = Array.isArray(payload?.names) ? payload.names : [];
+                        names = fetchedNames
+                            .map((name) => (typeof name === 'string' ? name.trim() : ''))
+                            .filter((name) => name.length > 0);
+                    } catch (error) {
+                        showFeedback('コピーに失敗しました', true);
+                        return;
+                    }
 
                     if (names.length === 0) {
                         showFeedback('コピー対象なし', true);

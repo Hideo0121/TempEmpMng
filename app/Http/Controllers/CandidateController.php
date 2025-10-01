@@ -27,15 +27,18 @@ use App\Mail\CandidateAssignmentMail;
 
 class CandidateController extends Controller
 {
+    private const PER_PAGE_OPTIONS = [10, 25, 50, 100];
+
     public function index(Request $request)
     {
         $user = $request->user();
         $remindState = (string) $request->string('remind_30m', 'all');
         $viewState = (string) $request->string('view_state', 'all');
         [$sortKey, $sortDirection] = $this->parseSort($request);
+        $perPage = $this->resolvePerPage($request);
 
         $candidates = $this->filteredCandidatesQuery($request, $user, $sortKey, $sortDirection)
-            ->paginate(10)
+            ->paginate($perPage)
             ->withQueryString();
 
         $agencies = Agency::query()->orderBy('name')->get();
@@ -64,9 +67,11 @@ class CandidateController extends Controller
                 'handler' => $request->input('handler'),
                 'remind_30m' => $remindState,
                 'view_state' => $viewState,
+                'per_page' => $perPage,
             ],
             'currentSort' => $sortKey,
             'currentDirection' => $sortDirection,
+            'perPageOptions' => self::PER_PAGE_OPTIONS,
         ]);
     }
 
@@ -146,10 +151,12 @@ class CandidateController extends Controller
         ]);
     }
 
-    protected function filteredCandidatesQuery(Request $request, ?User $user, ?string $sort = null, ?string $direction = null): Builder
+    protected function filteredCandidatesQuery(Request $request, ?User $user, ?string $sort = null, ?string $direction = null, bool $withRelations = true): Builder
     {
-        $query = Candidate::query()
-            ->with([
+        $query = Candidate::query();
+
+        if ($withRelations) {
+            $query->with([
                 'agency',
                 'status',
                 'handler1',
@@ -161,6 +168,7 @@ class CandidateController extends Controller
                 'confirmedInterview',
                 'views' => fn ($q) => $user ? $q->where('user_id', $user->id) : $q->whereRaw('1 = 0'),
             ]);
+        }
 
         if ($user) {
             $query->withCount([
@@ -748,6 +756,41 @@ class CandidateController extends Controller
 
         $view->last_viewed_at = $now;
         $view->save();
+    }
+
+    protected function resolvePerPage(Request $request): int
+    {
+        $perPage = $request->integer('per_page', self::PER_PAGE_OPTIONS[0]);
+
+        if (!in_array($perPage, self::PER_PAGE_OPTIONS, true)) {
+            return self::PER_PAGE_OPTIONS[0];
+        }
+
+        return $perPage;
+    }
+
+    public function names(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        [$sortKey, $sortDirection] = $this->parseSort($request);
+
+        $names = [];
+
+        $this->filteredCandidatesQuery($request, $user, $sortKey, $sortDirection, false)
+            ->select('candidates.name')
+            ->chunk(500, function ($chunk) use (&$names) {
+                foreach ($chunk as $candidate) {
+                    $name = (string) ($candidate->name ?? '');
+
+                    if ($name !== '') {
+                        $names[] = $name;
+                    }
+                }
+            });
+
+        return response()->json([
+            'names' => $names,
+        ]);
     }
 
     private function formOptions(): array
