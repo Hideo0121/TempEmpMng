@@ -24,24 +24,24 @@
     <table class="wrapper" width="100%" cellpadding="0" cellspacing="0" role="presentation">
         <tr>
             <td align="center">
-                <table class="content" width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width: 760px;">
+                <table class="content" width="1200" cellpadding="0" cellspacing="0" role="presentation" style="width: 100%; max-width: 1200px; margin: 0 auto;">
                     {{ $header ?? '' }}
 
                     <!-- Email Body -->
                     <tr>
                         <td class="body" width="100%" cellpadding="0" cellspacing="0" style="border-top: 1px solid #e8e5ef; border-bottom: 1px solid #e8e5ef; background-color: #edf2f7;">
-                            <table class="inner-body" align="center" width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width: 720px; margin: 0 auto; background-color: #ffffff;">
+                            <table class="inner-body" align="center" width="1160" cellpadding="0" cellspacing="0" role="presentation" style="width: 100%; max-width: 1160px; margin: 0 auto; background-color: #ffffff;">
                                 <!-- Body content -->
                                 <tr>
                                     <td class="content-cell" style="padding: 35px;">
-                                        {{ $slot }}
+                                        {!! Illuminate\Mail\Markdown::parse($slot) !!}
+
+                                        {!! $subcopy ?? '' !!}
                                     </td>
                                 </tr>
                             </table>
                         </td>
                     </tr>
-
-                    {{ $subcopy ?? '' }}
 
                     <tr>
                         <td>
