@@ -73,8 +73,9 @@
     };
 @endphp
 
-<form class="space-y-6" method="post" action="{{ $formAction }}" enctype="multipart/form-data">
+<form class="space-y-6" method="post" action="{{ $formAction }}" enctype="multipart/form-data" data-candidate-form>
     @csrf
+    <input type="hidden" name="notify_handlers" value="0" data-notify-input>
     @if ($httpMethod !== 'POST')
         @method($httpMethod)
     @endif
@@ -481,9 +482,58 @@
         updateState();
     };
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initDecidedJobToggle);
-    } else {
+    const initHandlerNotificationPrompt = () => {
+        const form = document.querySelector('[data-candidate-form]');
+
+        if (!form) {
+            return;
+        }
+
+        const notifyInput = form.querySelector('[data-notify-input]');
+
+        if (!notifyInput) {
+            return;
+        }
+
+        const handlerSelects = [
+            form.querySelector('select[name="handler1"]'),
+            form.querySelector('select[name="handler2"]'),
+        ];
+
+        let submissionConfirmed = false;
+
+        form.addEventListener('submit', (event) => {
+            if (submissionConfirmed) {
+                submissionConfirmed = false;
+                return;
+            }
+
+            const hasHandlers = handlerSelects.some((select) => select && select.value);
+
+            if (!hasHandlers) {
+                notifyInput.value = '0';
+                submissionConfirmed = true;
+                return;
+            }
+
+            event.preventDefault();
+
+            const shouldSend = window.confirm('職場見学対応者にメール通知を送信しますか？\n[OK] で送信 / [キャンセル] で送信せず保存します。');
+
+            notifyInput.value = shouldSend ? '1' : '0';
+            submissionConfirmed = true;
+            form.submit();
+        });
+    };
+
+    const initCandidateFormEnhancements = () => {
         initDecidedJobToggle();
+        initHandlerNotificationPrompt();
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initCandidateFormEnhancements);
+    } else {
+        initCandidateFormEnhancements();
     }
 </script>

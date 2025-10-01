@@ -21,6 +21,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
+use App\Mail\CandidateAssignmentMail;
 
 class CandidateController extends Controller
 {
@@ -362,6 +365,7 @@ class CandidateController extends Controller
     public function store(CandidateRequest $request): RedirectResponse
     {
         $user = $request->user();
+        $shouldNotify = $request->boolean('notify_handlers');
 
         $candidate = DB::transaction(function () use ($request, $user) {
             $data = $request->validated();
@@ -380,6 +384,9 @@ class CandidateController extends Controller
 
             return $candidate;
         });
+
+        $this->markCandidateViewedBy($candidate, $user);
+        $this->notifyHandlers($candidate, $shouldNotify, false, $user);
 
         return redirect()
             ->route('dashboard')
@@ -463,6 +470,7 @@ class CandidateController extends Controller
     public function update(CandidateRequest $request, Candidate $candidate): RedirectResponse
     {
         $user = $request->user();
+        $shouldNotify = $request->boolean('notify_handlers');
 
         DB::transaction(function () use ($request, $candidate, $user) {
             $data = $request->validated();
@@ -485,6 +493,10 @@ class CandidateController extends Controller
 
             $this->syncConfirmedInterview($candidate, $data, $remindOverride);
         });
+
+        $candidate->refresh();
+
+        $this->notifyHandlers($candidate, $shouldNotify, true, $user);
 
         return redirect()
             ->route('candidates.edit', $candidate)
@@ -678,6 +690,64 @@ class CandidateController extends Controller
             'remind_1h_sent' => false,
             'remind_30m_sent' => false,
         ])->save();
+    }
+
+    private function notifyHandlers(Candidate $candidate, bool $shouldNotify, bool $isUpdate, ?User $actor): void
+    {
+        if (!$shouldNotify) {
+            return;
+        }
+
+        $candidate->loadMissing(['handler1', 'handler2']);
+
+        $handlers = $candidate->handlerCollection()
+            ->filter(fn ($handler) => $handler && filled($handler->email))
+            ->unique(fn ($handler) => $handler->id)
+            ->values();
+
+        if ($handlers->isEmpty()) {
+            return;
+        }
+
+        $candidate->loadMissing(['agency', 'status']);
+
+        $queueName = config('queue.notification_mail_queue', 'reminders');
+
+        foreach ($handlers as $handler) {
+            Log::info('Queuing candidate assignment notification', [
+                'candidate_id' => $candidate->id,
+                'handler_id' => $handler->id,
+                'queue' => $queueName,
+                'is_update' => $isUpdate,
+                'triggered_by' => $actor?->id,
+            ]);
+
+            Mail::to($handler->email)->queue(
+                (new CandidateAssignmentMail($candidate, $handler, $isUpdate, $actor))
+                    ->onQueue($queueName)
+            );
+        }
+    }
+
+    private function markCandidateViewedBy(Candidate $candidate, ?User $user): void
+    {
+        if (!$user) {
+            return;
+        }
+
+        $view = $candidate->views()->firstOrNew(['user_id' => $user->id]);
+        $now = now();
+
+        if (!$view->exists) {
+            $view->first_viewed_at = $now;
+            $view->view_count = 1;
+        } else {
+            $view->first_viewed_at = $view->first_viewed_at ?? $now;
+            $view->view_count = max(1, (int) ($view->view_count ?? 1));
+        }
+
+        $view->last_viewed_at = $now;
+        $view->save();
     }
 
     private function formOptions(): array

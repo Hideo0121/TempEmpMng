@@ -77,8 +77,12 @@ class SendInterviewReminderJobTest extends TestCase
             $this->assertSame('interview_reminder', $notification->type);
             $this->assertSame($interview->id, $notification->target_id);
 
-            Mail::assertQueued(InterviewReminderMail::class, function (InterviewReminderMail $mail) use ($interview) {
-                return $mail->interview->is($interview) && $mail->slot === 'one_hour';
+            $expectedQueue = config('queue.notification_mail_queue', 'reminders');
+
+            Mail::assertQueued(InterviewReminderMail::class, function (InterviewReminderMail $mail) use ($interview, $expectedQueue) {
+                return $mail->interview->is($interview)
+                    && $mail->slot === 'one_hour'
+                    && $mail->queue === $expectedQueue;
             });
 
             $this->assertTrue($interview->fresh()->remind_1h_sent);
@@ -130,8 +134,12 @@ class SendInterviewReminderJobTest extends TestCase
 
             (new SendInterviewReminderJob())->handle();
 
-            Mail::assertQueued(InterviewReminderMail::class, function (InterviewReminderMail $mail) use ($interview) {
-                return $mail->interview->is($interview) && $mail->slot === 'thirty_minutes';
+            $expectedQueue = config('queue.notification_mail_queue', 'reminders');
+
+            Mail::assertQueued(InterviewReminderMail::class, function (InterviewReminderMail $mail) use ($interview, $expectedQueue) {
+                return $mail->interview->is($interview)
+                    && $mail->slot === 'thirty_minutes'
+                    && $mail->queue === $expectedQueue;
             });
 
             $this->assertTrue($interview->fresh()->remind_30m_sent);

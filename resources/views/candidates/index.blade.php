@@ -169,6 +169,7 @@
                 <span>{{ $sortDescription }}</span>
             </div>
             <div class="flex items-center gap-3 text-sm">
+                <button type="button" class="rounded-full border border-blue-200 px-3 py-1 font-semibold text-blue-600 transition hover:bg-blue-50" data-copy-names>氏名コピー</button>
                 <a href="{{ route('candidates.export', request()->query()) }}"
                     class="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600 transition hover:bg-slate-200">CSVエクスポート</a>
             </div>
@@ -306,7 +307,7 @@
                             $statusBorderColor = $statusColor . '80';
                             $statusLabel = $status->label ?? 'ステータス未設定';
                         @endphp
-                        <tr class="transition hover:bg-slate-50" data-candidate-row="{{ $candidate->id }}">
+                        <tr class="transition hover:bg-slate-50" data-candidate-row="{{ $candidate->id }}" data-candidate-name="{{ $candidate->name }}">
                             <td class="p-4">
                                 @if (!$viewRecord)
                                     <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white" title="未閲覧">●</span>
@@ -445,6 +446,88 @@
                 searchButton.addEventListener('click', () => {
                     sortInput.value = '';
                     directionInput.value = '';
+                });
+            }
+
+            const copyNamesButton = document.querySelector('[data-copy-names]');
+            if (copyNamesButton) {
+                const originalLabel = copyNamesButton.textContent.trim();
+
+                const fallbackCopy = (text) => {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = text;
+                    textarea.setAttribute('readonly', '');
+                    textarea.style.position = 'absolute';
+                    textarea.style.left = '-9999px';
+                    document.body.appendChild(textarea);
+
+                    const selection = document.getSelection();
+                    const originalRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+
+                    textarea.select();
+                    textarea.setSelectionRange(0, textarea.value.length);
+
+                    let successful = false;
+                    try {
+                        successful = document.execCommand('copy');
+                    } catch (error) {
+                        successful = false;
+                    }
+
+                    document.body.removeChild(textarea);
+                    if (originalRange && selection) {
+                        selection.removeAllRanges();
+                        selection.addRange(originalRange);
+                    }
+
+                    return successful;
+                };
+
+                const showFeedback = (message, isError = false) => {
+                    copyNamesButton.textContent = message;
+                    copyNamesButton.disabled = true;
+
+                    if (isError) {
+                        copyNamesButton.classList.add('bg-rose-50', 'text-rose-600', 'border-rose-200');
+                    } else {
+                        copyNamesButton.classList.remove('bg-rose-50', 'text-rose-600', 'border-rose-200');
+                    }
+
+                    setTimeout(() => {
+                        copyNamesButton.textContent = originalLabel;
+                        copyNamesButton.disabled = false;
+                        copyNamesButton.classList.remove('bg-rose-50', 'text-rose-600', 'border-rose-200');
+                    }, 2000);
+                };
+
+                copyNamesButton.addEventListener('click', async () => {
+                    const rows = Array.from(document.querySelectorAll('[data-candidate-row][data-candidate-name]'));
+                    const names = rows
+                        .map((row) => (row.dataset.candidateName || '').trim())
+                        .filter((name) => name.length > 0);
+
+                    if (names.length === 0) {
+                        showFeedback('コピー対象なし', true);
+                        return;
+                    }
+
+                    const text = names.join('\n');
+                    let success = false;
+
+                    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                        try {
+                            await navigator.clipboard.writeText(text);
+                            success = true;
+                        } catch (error) {
+                            success = false;
+                        }
+                    }
+
+                    if (!success) {
+                        success = fallbackCopy(text);
+                    }
+
+                    showFeedback(success ? 'コピーしました' : 'コピーに失敗しました', !success);
                 });
             }
 

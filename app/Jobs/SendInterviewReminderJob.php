@@ -47,11 +47,14 @@ class SendInterviewReminderJob implements ShouldQueue
         $to = $this->buildToAddresses($interview);
         $cc = $this->buildCcAddresses($interview);
 
+        $queueName = config('queue.notification_mail_queue', 'reminders');
+
         Log::info('Queueing interview reminder', [
             'interview_id' => $interview->id,
             'slot' => $slot,
             'to' => $to,
             'cc' => $cc,
+            'queue' => $queueName,
         ]);
 
         $notification = Notification::create([
@@ -82,7 +85,10 @@ class SendInterviewReminderJob implements ShouldQueue
         try {
             Mail::to($to)
                 ->cc($cc)
-                ->queue(new InterviewReminderMail($interview, $slot));
+                ->queue(
+                    (new InterviewReminderMail($interview, $slot))
+                        ->onQueue($queueName)
+                );
 
             $notification->update([
                 'status' => 'sent',

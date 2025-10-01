@@ -139,13 +139,22 @@ class CandidateFiltersTest extends TestCase
         $response = $this->actingAs($user)->post(route('candidates.store'), $payload);
 
         $response->assertRedirect(route('dashboard'));
+        $candidate = Candidate::where('name', '新規候補者')->first();
+
+        $this->assertNotNull($candidate);
         $this->assertDatabaseHas('candidates', [
-            'name' => '新規候補者',
+            'id' => $candidate->id,
             'agency_id' => $agency->id,
         ]);
 
         $this->assertDatabaseHas('interviews', [
+            'candidate_id' => $candidate->id,
             'remind_30m_enabled' => true,
+        ]);
+
+        $this->assertDatabaseHas('candidate_views', [
+            'candidate_id' => $candidate->id,
+            'user_id' => $user->id,
         ]);
     }
 

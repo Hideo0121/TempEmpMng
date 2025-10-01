@@ -14,6 +14,7 @@ return [
     */
 
     'default' => env('QUEUE_CONNECTION', 'database'),
+    'notification_mail_queue' => env('MAIL_NOTIFICATIONS_QUEUE', 'reminders'),
 
     /*
     |--------------------------------------------------------------------------
