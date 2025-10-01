@@ -113,4 +113,6 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    'always_bcc' => env('MAIL_ALWAYS_BCC', 'h_kasai@seihou-osaka.com'),
+
 ];

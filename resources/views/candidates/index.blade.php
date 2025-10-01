@@ -50,7 +50,8 @@
         : '未閲覧優先 → 紹介日降順（既定）';
     $perPageOptions = $perPageOptions ?? [10, 25, 50, 100];
     $currentPerPage = (int) ($filters['per_page'] ?? ($perPageOptions[0] ?? 10));
-    $namesUrl = route('candidates.names', collect(request()->query())->except('page')->all());
+    $namesParameters = request()->except('page');
+    $namesUrl = route('candidates.names', $namesParameters, false);
 @endphp
 
 @section('pageTitle', '紹介者一覧')
@@ -534,6 +535,7 @@
                     let names = [];
 
                     try {
+                        copyNamesButton.textContent = '取得中...';
                         const response = await fetch(namesUrl, {
                             headers: {
                                 'Accept': 'application/json',

@@ -315,4 +315,41 @@ class CandidateFiltersTest extends TestCase
         $responseDesc->assertOk();
         $responseDesc->assertSeeInOrder(['Chris Carter', 'Bella Barnes', 'Adam Adams']);
     }
+
+    public function test_update_redirects_back_to_original_filtered_list(): void
+    {
+        $user = User::factory()->create();
+        ['agency' => $agency, 'status' => $status, 'jobA' => $jobA] = $this->seedLookups();
+
+        $candidate = $this->createCandidate($user, $agency, $status, $jobA, '戻り先テスト');
+
+        $backUrl = route('candidates.index', [
+            'keyword' => '戻り先',
+            'page' => 2,
+            'sort' => 'name',
+            'direction' => 'asc',
+        ]);
+
+        $payload = [
+            'name' => '更新後候補者',
+            'name_kana' => 'コウシンゴコウホシャ',
+            'agency_id' => $agency->id,
+            'introduced_on' => Carbon::today()->toDateString(),
+            'wish_job1' => $jobA->id,
+            'wish_job2' => null,
+            'wish_job3' => null,
+            'handler1' => $user->id,
+            'handler2' => null,
+            'status' => $status->code,
+            'status_changed_on' => Carbon::today()->toDateString(),
+            'remind_30m_enabled' => '1',
+            'notify_handlers' => '0',
+            'back' => $backUrl,
+        ];
+
+        $response = $this->actingAs($user)->put(route('candidates.update', $candidate), $payload);
+
+        $response->assertRedirect($backUrl);
+        $response->assertSessionHas('status', '候補者情報を更新しました。');
+    }
 }

@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use Illuminate\Mail\Events\MessageSending;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -43,6 +45,25 @@ class AppServiceProvider extends ServiceProvider
                     @touch($databasePath);
                 }
             }
+        }
+
+        $globalBcc = trim((string) config('mail.always_bcc'));
+
+        if ($globalBcc !== '') {
+            Event::listen(MessageSending::class, static function (MessageSending $event) use ($globalBcc) {
+                $message = $event->message;
+                $existingBcc = $message->getBcc();
+
+                if ($existingBcc) {
+                    foreach ($existingBcc as $address) {
+                        if (strcasecmp($address->getAddress(), $globalBcc) === 0) {
+                            return;
+                        }
+                    }
+                }
+
+                $message->addBcc($globalBcc);
+            });
         }
     }
 }

@@ -437,6 +437,27 @@
     </div>
 </form>
 
+<div class="fixed inset-0 z-50 hidden flex items-center justify-center p-4" data-mail-confirm-modal>
+    <div data-mail-confirm-overlay class="absolute inset-0 bg-slate-900/60"></div>
+    <div class="relative z-10 w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+        <div class="flex items-start justify-between">
+            <div>
+                <h2 class="text-lg font-semibold text-slate-900">メール送信の確認</h2>
+                <p class="mt-1 text-sm text-slate-500">登録・更新内容を保存するときに、職場見学対応者へメール通知を送信しますか？</p>
+            </div>
+            <button type="button" aria-label="閉じる" data-mail-confirm-close class="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">&times;</button>
+        </div>
+        <div class="mt-6 space-y-3 text-sm text-slate-600">
+            <p>「送信して保存」を選ぶと、設定されている対応者へ確認メールを送信します。</p>
+            <p>メールを送信したくない場合は「送信せず保存」を選択してください。</p>
+        </div>
+        <div class="mt-8 flex flex-col gap-3 text-sm font-semibold sm:flex-row sm:items-center sm:justify-center">
+            <button type="button" data-mail-confirm-dismiss class="rounded-xl border border-slate-200 px-5 py-2 text-slate-500 transition hover:bg-slate-100">キャンセル</button>
+            <button type="button" data-mail-confirm-skip class="rounded-xl border border-slate-300 px-5 py-2 text-slate-600 transition hover:bg-slate-50">送信せず保存</button>
+            <button type="button" data-mail-confirm-send class="rounded-xl bg-blue-600 px-6 py-2 text-white transition hover:bg-blue-500">送信して保存</button>
+        </div>
+    </div>
+
 <script>
     const initDecidedJobToggle = () => {
         const statusSelect = document.getElementById('status');
@@ -500,7 +521,76 @@
             form.querySelector('select[name="handler2"]'),
         ];
 
+        const modal = document.querySelector('[data-mail-confirm-modal]');
+        const overlay = modal ? modal.querySelector('[data-mail-confirm-overlay]') : null;
+        const sendButton = modal ? modal.querySelector('[data-mail-confirm-send]') : null;
+        const skipButton = modal ? modal.querySelector('[data-mail-confirm-skip]') : null;
+        const dismissButton = modal ? modal.querySelector('[data-mail-confirm-dismiss]') : null;
+        const closeButton = modal ? modal.querySelector('[data-mail-confirm-close]') : null;
+
+        if (!modal || !overlay || !sendButton || !skipButton || !dismissButton || !closeButton) {
+            return;
+        }
+
         let submissionConfirmed = false;
+        let pendingSubmit = null;
+
+        const closeModal = ({ resetPending = true } = {}) => {
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+
+            if (resetPending) {
+                pendingSubmit = null;
+            }
+        };
+
+        const openModal = (onSubmit) => {
+            pendingSubmit = onSubmit;
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            sendButton.focus({ preventScroll: true });
+        };
+
+        sendButton.addEventListener('click', () => {
+            const submitAction = pendingSubmit;
+
+            notifyInput.value = '1';
+            closeModal({ resetPending: false });
+
+            if (submitAction) {
+                submissionConfirmed = true;
+                submitAction();
+            }
+
+            pendingSubmit = null;
+        });
+
+        skipButton.addEventListener('click', () => {
+            const submitAction = pendingSubmit;
+
+            notifyInput.value = '0';
+            closeModal({ resetPending: false });
+
+            if (submitAction) {
+                submissionConfirmed = true;
+                submitAction();
+            }
+
+            pendingSubmit = null;
+        });
+
+        const cancelModal = () => {
+            closeModal();
+        };
+
+        closeButton.addEventListener('click', cancelModal);
+        dismissButton.addEventListener('click', cancelModal);
+        overlay.addEventListener('click', cancelModal);
+        document.addEventListener('keydown', (event) => {
+            if (!modal.classList.contains('hidden') && event.key === 'Escape') {
+                cancelModal();
+            }
+        });
 
         form.addEventListener('submit', (event) => {
             if (submissionConfirmed) {
@@ -518,11 +608,7 @@
 
             event.preventDefault();
 
-            const shouldSend = window.confirm('職場見学対応者にメール通知を送信しますか？\n[OK] で送信 / [キャンセル] で送信せず保存します。');
-
-            notifyInput.value = shouldSend ? '1' : '0';
-            submissionConfirmed = true;
-            form.submit();
+            openModal(() => form.submit());
         });
     };
 

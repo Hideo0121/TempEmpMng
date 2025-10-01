@@ -22,6 +22,17 @@ class InterviewReminderMail extends Mailable implements ShouldQueue
 
     public function build(): self
     {
+        $this->interview->loadMissing([
+            'candidate',
+            'candidate.agency',
+            'candidate.handler1',
+            'candidate.handler2',
+            'candidate.createdBy',
+            'candidate.wishJob1',
+            'candidate.wishJob2',
+            'candidate.wishJob3',
+        ]);
+
         $timezone = config('reminder.timezone', config('app.timezone'));
         $scheduled = $this->interview->scheduled_at instanceof CarbonImmutable
             ? $this->interview->scheduled_at->setTimezone($timezone)

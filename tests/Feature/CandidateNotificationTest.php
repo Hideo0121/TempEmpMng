@@ -127,7 +127,7 @@ class CandidateNotificationTest extends TestCase
 
         $response = $this->actingAs($user)->put(route('candidates.update', $candidate), $payload);
 
-        $response->assertRedirect(route('candidates.edit', $candidate));
+    $response->assertRedirect(route('candidates.index'));
 
         Mail::assertNotQueued(CandidateAssignmentMail::class);
     }

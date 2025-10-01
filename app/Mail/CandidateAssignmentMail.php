@@ -24,6 +24,14 @@ class CandidateAssignmentMail extends Mailable implements ShouldQueue
 
     public function build(): self
     {
+        $this->candidate->loadMissing([
+            'agency',
+            'status',
+            'wishJob1',
+            'wishJob2',
+            'wishJob3',
+        ]);
+
         $actionLabel = $this->isUpdate ? '更新' : '登録';
         $subject = sprintf('[紹介者通知] %s さんの情報が%sされました', $this->candidate->name, $actionLabel);
 

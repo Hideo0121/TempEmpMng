@@ -61,7 +61,7 @@
     <footer class="border-t border-slate-200 bg-white">
     <div class="mx-auto flex max-w-[110rem] items-center justify-between px-6 py-4 text-xs text-slate-500">
             <span>© {{ date('Y') }} TempEmpMng. 内部利用専用。</span>
-            <span>Ver. 0.1.0-prototype</span>
+            <span>Ver. {{ config('app.version', '0.1.0-prototype') }}</span>
         </div>
     </footer>
 </body>

@@ -506,8 +506,14 @@ class CandidateController extends Controller
 
         $this->notifyHandlers($candidate, $shouldNotify, true, $user);
 
+        $backUrl = $request->input('back');
+
+        if (!is_string($backUrl) || !Str::startsWith($backUrl, url('/'))) {
+            $backUrl = route('candidates.index');
+        }
+
         return redirect()
-            ->route('candidates.edit', $candidate)
+            ->to($backUrl)
             ->with('status', '候補者情報を更新しました。');
     }
 
@@ -777,7 +783,6 @@ class CandidateController extends Controller
         $names = [];
 
         $this->filteredCandidatesQuery($request, $user, $sortKey, $sortDirection, false)
-            ->select('candidates.name')
             ->chunk(500, function ($chunk) use (&$names) {
                 foreach ($chunk as $candidate) {
                     $name = (string) ($candidate->name ?? '');

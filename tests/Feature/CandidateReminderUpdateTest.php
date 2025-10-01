@@ -93,7 +93,7 @@ class CandidateReminderUpdateTest extends TestCase
 
         $response = $this->actingAs($user)->put(route('candidates.update', $candidate), $payload);
 
-        $response->assertRedirect(route('candidates.edit', $candidate));
+    $response->assertRedirect(route('candidates.index'));
 
         $candidate->refresh();
         $this->assertFalse($candidate->confirmedInterview->remind_30m_enabled);
