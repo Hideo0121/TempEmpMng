@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Contracts\View\View as ViewContract;
 use Illuminate\View\View;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
@@ -397,6 +398,21 @@ class CandidateController extends Controller
         $this->markCandidateViewedBy($candidate, $user);
         $this->notifyHandlers($candidate, $shouldNotify, false, $user);
 
+        $candidate->loadMissing('status');
+
+        if (CandidateStatus::isEmployed((string) $candidate->status_code)) {
+            $request->session()->put('celebration.payload', [
+                'candidate_name' => $candidate->name,
+                'status_label' => $candidate->status?->label ?? '就業決定',
+                'redirect_url' => route('dashboard'),
+                'delay_seconds' => 5,
+            ]);
+
+            $request->session()->flash('status', '候補者を登録しました。');
+
+            return redirect()->route('candidates.celebrate');
+        }
+
         return redirect()
             ->route('dashboard')
             ->with('status', '候補者を登録しました。');
@@ -480,10 +496,10 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         $shouldNotify = $request->boolean('notify_handlers');
+        $originalStatus = $candidate->status_code;
 
-        DB::transaction(function () use ($request, $candidate, $user) {
+        DB::transaction(function () use ($request, $candidate, $user, $originalStatus) {
             $data = $request->validated();
-            $originalStatus = $candidate->status_code;
 
             $candidate->fill($this->candidateAttributesFromRequest($request, $user, $candidate));
             $candidate->save();
@@ -504,6 +520,7 @@ class CandidateController extends Controller
         });
 
         $candidate->refresh();
+        $candidate->loadMissing('status');
 
         $this->notifyHandlers($candidate, $shouldNotify, true, $user);
 
@@ -513,9 +530,45 @@ class CandidateController extends Controller
             $backUrl = route('candidates.index');
         }
 
+        if (!CandidateStatus::isEmployed((string) $originalStatus)
+            && CandidateStatus::isEmployed((string) $candidate->status_code)
+        ) {
+            $request->session()->put('celebration.payload', [
+                'candidate_name' => $candidate->name,
+                'status_label' => $candidate->status?->label ?? '就業決定',
+                'redirect_url' => $backUrl,
+                'delay_seconds' => 5,
+            ]);
+
+            $request->session()->flash('status', '候補者情報を更新しました。');
+
+            return redirect()->route('candidates.celebrate');
+        }
+
         return redirect()
             ->to($backUrl)
             ->with('status', '候補者情報を更新しました。');
+    }
+
+    public function celebrate(Request $request): ViewContract|RedirectResponse
+    {
+        $payload = $request->session()->pull('celebration.payload');
+
+        if (!is_array($payload)) {
+            return redirect()->route('dashboard');
+        }
+
+        $request->session()->reflash();
+
+        $delaySeconds = (int) ($payload['delay_seconds'] ?? 5);
+        $delaySeconds = $delaySeconds > 0 ? $delaySeconds : 5;
+
+        return view('candidates.celebrate', [
+            'candidateName' => $payload['candidate_name'] ?? null,
+            'statusLabel' => $payload['status_label'] ?? '就業決定',
+            'redirectUrl' => $payload['redirect_url'] ?? route('dashboard'),
+            'delaySeconds' => $delaySeconds,
+        ]);
     }
 
     public function changeStatus(ChangeCandidateStatusRequest $request, Candidate $candidate): JsonResponse
@@ -553,6 +606,25 @@ class CandidateController extends Controller
 
         $candidate->refresh()->load(['status', 'decidedJob']);
 
+        $redirectTarget = (string) $request->input('redirect_to', route('candidates.index'));
+
+        if (!Str::startsWith($redirectTarget, url('/'))) {
+            $redirectTarget = route('candidates.index');
+        }
+
+        $shouldCelebrate = $statusChanged && CandidateStatus::isEmployed((string) $candidate->status_code);
+
+        if ($shouldCelebrate) {
+            $request->session()->put('celebration.payload', [
+                'candidate_name' => $candidate->name,
+                'status_label' => $candidate->status?->label ?? '就業決定',
+                'redirect_url' => $redirectTarget,
+                'delay_seconds' => 5,
+            ]);
+
+            $request->session()->flash('status', 'ステータスを更新しました。');
+        }
+
         return response()->json([
             'status_code' => $candidate->status_code,
             'status_label' => $candidate->status?->label ?? 'ステータス未設定',
@@ -561,6 +633,7 @@ class CandidateController extends Controller
             'decided_job_label' => optional($candidate->decidedJob)->name ?? '—',
             'decided_job_id' => $candidate->decided_job_category_id,
             'changed' => $statusChanged,
+            'celebrate_url' => $shouldCelebrate ? route('candidates.celebrate') : null,
         ]);
     }
 

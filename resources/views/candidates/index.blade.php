@@ -701,13 +701,16 @@
                 submitButton.textContent = submitButton.dataset.loadingText || '更新中...';
 
                 try {
+                    const formData = new FormData(form);
+                    formData.set('redirect_to', window.location.href);
+
                     const response = await fetch(form.action, {
                         method: 'POST',
                         headers: {
                             'X-Requested-With': 'XMLHttpRequest',
                             'Accept': 'application/json',
                         },
-                        body: new FormData(form),
+                        body: formData,
                     });
 
                     if (!response.ok) {
@@ -756,6 +759,12 @@
                         } else {
                             decidedJobCell.innerHTML = '<span class="text-slate-400">—</span>';
                         }
+                    }
+
+                    if (data.celebrate_url) {
+                        closeModal();
+                        window.location.assign(data.celebrate_url);
+                        return;
                     }
 
                     closeModal();

@@ -27,6 +27,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/candidates/export', [CandidateController::class, 'export'])->name('candidates.export');
     Route::get('/candidates/create', [CandidateController::class, 'create'])->name('candidates.create');
     Route::post('/candidates', [CandidateController::class, 'store'])->name('candidates.store');
+    Route::get('/candidates/celebrate', [CandidateController::class, 'celebrate'])->name('candidates.celebrate');
     Route::get('/candidates/{candidate}/edit', [CandidateController::class, 'edit'])->name('candidates.edit');
     Route::put('/candidates/{candidate}', [CandidateController::class, 'update'])->name('candidates.update');
     Route::patch('/candidates/{candidate}/status', [CandidateController::class, 'changeStatus'])->name('candidates.status.update');

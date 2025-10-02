@@ -191,7 +191,8 @@ class CandidateFiltersTest extends TestCase
 
         $response = $this->actingAs($user)->post(route('candidates.store'), $payload);
 
-        $response->assertRedirect(route('dashboard'));
+        $response->assertRedirect(route('candidates.celebrate'));
+        $response->assertSessionHas('celebration.payload');
         $this->assertDatabaseHas('candidates', [
             'name' => '就業決定テスト',
             'decided_job_category_id' => $jobA->id,
@@ -283,13 +284,25 @@ class CandidateFiltersTest extends TestCase
             ->assertStatus(422)
             ->assertJsonValidationErrors('decided_job');
 
-        $this->actingAs($user)
+        $response = $this->actingAs($user)
             ->patchJson(route('candidates.status.update', $candidate), [
                 'status_code' => CandidateStatus::CODE_EMPLOYED,
                 'decided_job' => $jobA->id,
-            ])
+            ]);
+
+        $response
             ->assertOk()
-            ->assertJson(["decided_job_id" => $jobA->id]);
+            ->assertJson([
+                'decided_job_id' => $jobA->id,
+                'celebrate_url' => route('candidates.celebrate'),
+            ]);
+
+        $response->assertSessionHas('celebration.payload', function ($payload) {
+            return is_array($payload)
+                && ($payload['status_label'] ?? null) === '就業決定'
+                && ($payload['delay_seconds'] ?? null) === 5;
+        });
+        $this->assertSame('ステータスを更新しました。', session('status'));
 
         $this->assertDatabaseHas('candidates', [
             'id' => $candidate->id,
@@ -314,6 +327,67 @@ class CandidateFiltersTest extends TestCase
         $responseDesc = $this->actingAs($user)->get(route('candidates.index', ['sort' => 'name', 'direction' => 'desc']));
         $responseDesc->assertOk();
         $responseDesc->assertSeeInOrder(['Chris Carter', 'Bella Barnes', 'Adam Adams']);
+    }
+
+    public function test_update_redirects_to_celebration_when_status_changes_to_employed(): void
+    {
+        $user = User::factory()->create();
+        ['agency' => $agency, 'status' => $entryStatus, 'jobA' => $jobA] = $this->seedLookups();
+
+        $employedStatus = CandidateStatus::create([
+            'code' => CandidateStatus::CODE_EMPLOYED,
+            'label' => '就業決定',
+            'sort_order' => 99,
+            'is_active' => true,
+            'is_employed_state' => true,
+        ]);
+        CandidateStatus::refreshEmployedCache();
+
+        $candidate = $this->createCandidate($user, $agency, $entryStatus, $jobA, '祝福対象');
+
+        $backUrl = route('candidates.index', ['page' => 3, 'keyword' => '祝福']);
+
+        $payload = [
+            'name' => '祝福対象',
+            'name_kana' => 'シュクフクタイショウ',
+            'agency_id' => $agency->id,
+            'introduced_on' => Carbon::today()->toDateString(),
+            'wish_job1' => $jobA->id,
+            'wish_job2' => null,
+            'wish_job3' => null,
+            'handler1' => $user->id,
+            'handler2' => null,
+            'status' => $employedStatus->code,
+            'status_changed_on' => Carbon::today()->toDateString(),
+            'decided_job' => $jobA->id,
+            'remind_30m_enabled' => '1',
+            'notify_handlers' => '0',
+            'back' => $backUrl,
+        ];
+
+        $response = $this->actingAs($user)->put(route('candidates.update', $candidate), $payload);
+
+        $response->assertRedirect(route('candidates.celebrate'));
+        $response->assertSessionHas('celebration.payload', function ($payload) use ($backUrl) {
+            return is_array($payload)
+                && ($payload['redirect_url'] ?? null) === $backUrl
+                && ($payload['candidate_name'] ?? null) === '祝福対象';
+        });
+
+        $this->assertDatabaseHas('candidates', [
+            'id' => $candidate->id,
+            'status_code' => $employedStatus->code,
+            'decided_job_category_id' => $jobA->id,
+        ]);
+    }
+
+    public function test_celebration_route_without_payload_redirects_to_dashboard(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('candidates.celebrate'));
+
+        $response->assertRedirect(route('dashboard'));
     }
 
     public function test_update_redirects_back_to_original_filtered_list(): void
