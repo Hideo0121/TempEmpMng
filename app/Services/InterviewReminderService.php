@@ -8,7 +8,7 @@ use Carbon\CarbonInterface;
 
 class InterviewReminderService
 {
-    private const SLOTS = ['prev_day', 'one_hour', 'thirty_minutes'];
+    private const SLOTS = ['thirty_minutes'];
 
     /**
      * Iterate interviews scheduled for reminder slots and invoke the callback for each due slot.
@@ -34,27 +34,17 @@ class InterviewReminderService
 
     protected function shouldSendReminder(Interview $interview, string $slot, CarbonImmutable $current): bool
     {
-        if ($slot === 'thirty_minutes' && ($interview->remind_30m_enabled === false || config('reminder.disable_30m'))) {
-            return false;
-        }
-
-        $flagColumn = match ($slot) {
-            'prev_day' => 'remind_prev_day_sent',
-            'one_hour' => 'remind_1h_sent',
-            'thirty_minutes' => 'remind_30m_sent',
-        };
-
-        if ($interview->{$flagColumn}) {
+        if ($interview->remind_30m_enabled === false || config('reminder.disable_30m')) {
             return false;
         }
 
         $scheduled = $this->scheduledAt($interview);
 
-        $expectedTime = match ($slot) {
-            'prev_day' => $scheduled->subDay()->setTime(9, 0),
-            'one_hour' => $scheduled->subHour(),
-            'thirty_minutes' => $scheduled->subMinutes(30),
-        };
+        if ($interview->remind_30m_sent) {
+            return false;
+        }
+
+        $expectedTime = $scheduled->subMinutes(30);
 
         return $current->betweenIncluded($expectedTime->subMinutes(2), $expectedTime->addMinutes(2));
     }

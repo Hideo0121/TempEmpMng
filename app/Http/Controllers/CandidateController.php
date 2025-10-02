@@ -28,6 +28,7 @@ use App\Mail\CandidateAssignmentMail;
 class CandidateController extends Controller
 {
     private const PER_PAGE_OPTIONS = [10, 25, 50, 100];
+    private const DEFAULT_PER_PAGE = 100;
 
     public function index(Request $request)
     {
@@ -766,10 +767,10 @@ class CandidateController extends Controller
 
     protected function resolvePerPage(Request $request): int
     {
-        $perPage = $request->integer('per_page', self::PER_PAGE_OPTIONS[0]);
+        $perPage = $request->integer('per_page', self::DEFAULT_PER_PAGE);
 
         if (!in_array($perPage, self::PER_PAGE_OPTIONS, true)) {
-            return self::PER_PAGE_OPTIONS[0];
+            return self::DEFAULT_PER_PAGE;
         }
 
         return $perPage;

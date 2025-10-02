@@ -30,8 +30,6 @@ if ($interviews->isNotEmpty()) {
         : \Carbon\CarbonImmutable::parse((string) $interview->scheduled_at, $timezone);
 
     $slotTimes = [
-        'prev_day' => $scheduledLocal->subDay()->setTime(9, 0),
-        'one_hour' => $scheduledLocal->subHour(),
         'thirty_minutes' => $scheduledLocal->subMinutes(30),
     ];
 

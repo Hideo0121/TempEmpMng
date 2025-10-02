@@ -39,7 +39,7 @@ class InterviewReminderMailTest extends TestCase
 
         $interview->setRelation('candidate', $candidate);
 
-        $mail = new InterviewReminderMail($interview, 'one_hour');
+        $mail = new InterviewReminderMail($interview, 'thirty_minutes');
         $built = $mail->build();
 
         $this->assertStringContainsString('[職場見学リマインド] 山田 太郎 さん 2025/10/01 10:00', $built->subject);
@@ -47,7 +47,7 @@ class InterviewReminderMailTest extends TestCase
         $rendered = $built->render();
 
         $this->assertStringContainsString('担当者A', $rendered);
-        $this->assertStringContainsString('1時間前リマインド', $rendered);
+        $this->assertStringContainsString('30分前リマインド', $rendered);
         $this->assertStringContainsString('希望職種①: 第一希望職種', $rendered);
         $this->assertStringContainsString('希望職種②: 第二希望職種', $rendered);
     }

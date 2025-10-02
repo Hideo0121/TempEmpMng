@@ -28,13 +28,92 @@ class SendInterviewReminderJobTest extends TestCase
         Config::set('reminder.cc_managers', 'manager@example.com');
     }
 
-    public function test_job_sends_one_hour_reminder_and_updates_flags(): void
+    public function test_job_sends_thirty_minute_reminder_to_handlers(): void
     {
         Mail::fake();
-        CarbonImmutable::setTestNow(CarbonImmutable::parse('2025-10-01 09:00:00', 'Asia/Tokyo'));
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2025-10-01 09:30:00', 'Asia/Tokyo'));
 
         try {
             $this->seedBaselineData();
+
+            $agency = Agency::create([
+                'name' => 'テスト派遣会社',
+                'email' => 'agency@example.com',
+            ]);
+
+            $handler1 = User::factory()->create([
+                'role' => 'staff',
+                'email' => 'handler1@example.com',
+            ]);
+
+            $handler2 = User::factory()->create([
+                'role' => 'staff',
+                'email' => 'handler2@example.com',
+            ]);
+
+            $owner = User::factory()->create([
+                'role' => 'manager',
+                'email' => 'owner@example.com',
+            ]);
+
+            $candidate = Candidate::create([
+                'name' => '山田 太郎',
+                'name_kana' => 'ヤマダ タロウ',
+                'agency_id' => $agency->id,
+                'introduced_on' => '2025-09-20',
+                'status_code' => 'visit_pending',
+                'handler1_user_id' => $handler1->id,
+                'handler2_user_id' => $handler2->id,
+                'created_by' => $owner->id,
+            ]);
+
+            $interview = Interview::create([
+                'candidate_id' => $candidate->id,
+                'scheduled_at' => '2025-10-01 10:00:00',
+                'place' => '本社ビル',
+                'memo' => '入館手続きに10分必要です。',
+                'remind_30m_enabled' => true,
+            ]);
+
+            (new SendInterviewReminderJob())->handle();
+
+            $notification = Notification::first();
+
+            $this->assertNotNull($notification);
+            $this->assertSame('sent', $notification->status);
+            $this->assertSame('interview_reminder', $notification->type);
+            $this->assertSame($interview->id, $notification->target_id);
+
+            $this->assertEqualsCanonicalizing(
+                ['handler1@example.com', 'handler2@example.com', 'agency@example.com'],
+                json_decode($notification->to_addresses, true)
+            );
+
+            $this->assertSame(['manager@example.com'], json_decode($notification->cc_addresses, true));
+
+            $expectedQueue = config('queue.notification_mail_queue', 'reminders');
+
+            Mail::assertQueued(InterviewReminderMail::class, function (InterviewReminderMail $mail) use ($interview, $expectedQueue) {
+                return $mail->interview->is($interview)
+                    && $mail->slot === 'thirty_minutes'
+                    && $mail->queue === $expectedQueue;
+            });
+
+            $this->assertTrue($interview->fresh()->remind_30m_sent);
+        } finally {
+            CarbonImmutable::setTestNow();
+        }
+    }
+
+    public function test_owner_email_is_not_included_even_if_listed_in_configuration(): void
+    {
+        Mail::fake();
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2025-10-01 09:30:00', 'Asia/Tokyo'));
+
+        try {
+            $this->seedBaselineData();
+
+            Config::set('reminder.cc_managers', 'manager@example.com, owner@example.com');
 
             $agency = Agency::create([
                 'name' => 'テスト派遣会社',
@@ -52,8 +131,8 @@ class SendInterviewReminderJobTest extends TestCase
             ]);
 
             $candidate = Candidate::create([
-                'name' => '山田 太郎',
-                'name_kana' => 'ヤマダ タロウ',
+                'name' => '高橋 次郎',
+                'name_kana' => 'タカハシ ジロウ',
                 'agency_id' => $agency->id,
                 'introduced_on' => '2025-09-20',
                 'status_code' => 'visit_pending',
@@ -64,34 +143,31 @@ class SendInterviewReminderJobTest extends TestCase
             $interview = Interview::create([
                 'candidate_id' => $candidate->id,
                 'scheduled_at' => '2025-10-01 10:00:00',
-                'place' => '本社ビル',
-                'memo' => '入館手続きに10分必要です。',
+                'remind_30m_enabled' => true,
             ]);
 
             (new SendInterviewReminderJob())->handle();
 
             $notification = Notification::first();
 
-            $this->assertNotNull($notification);
-            $this->assertSame('sent', $notification->status);
-            $this->assertSame('interview_reminder', $notification->type);
-            $this->assertSame($interview->id, $notification->target_id);
+            $this->assertEqualsCanonicalizing(
+                ['handler@example.com', 'agency@example.com'],
+                json_decode($notification->to_addresses, true)
+            );
 
-            $expectedQueue = config('queue.notification_mail_queue', 'reminders');
+            $this->assertSame(['manager@example.com'], json_decode($notification->cc_addresses, true));
 
-            Mail::assertQueued(InterviewReminderMail::class, function (InterviewReminderMail $mail) use ($interview, $expectedQueue) {
-                return $mail->interview->is($interview)
-                    && $mail->slot === 'one_hour'
-                    && $mail->queue === $expectedQueue;
+            Mail::assertQueued(InterviewReminderMail::class, function (InterviewReminderMail $mail) use ($owner) {
+                return ! $mail->hasTo($owner->email)
+                    && ! $mail->hasCc($owner->email);
             });
-
-            $this->assertTrue($interview->fresh()->remind_1h_sent);
         } finally {
             CarbonImmutable::setTestNow();
+            Config::set('reminder.cc_managers', 'manager@example.com');
         }
     }
 
-    public function test_job_sends_thirty_minute_reminder_when_enabled(): void
+    public function test_job_skips_thirty_minute_reminder_when_disabled_per_interview(): void
     {
         Mail::fake();
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2025-10-01 09:30:00', 'Asia/Tokyo'));
@@ -129,20 +205,14 @@ class SendInterviewReminderJobTest extends TestCase
                 'scheduled_at' => '2025-10-01 10:00:00',
                 'place' => '第2会議室',
                 'memo' => '入館カードは受付で受け取る',
-                'remind_30m_enabled' => true,
+                'remind_30m_enabled' => false,
             ]);
 
             (new SendInterviewReminderJob())->handle();
 
-            $expectedQueue = config('queue.notification_mail_queue', 'reminders');
-
-            Mail::assertQueued(InterviewReminderMail::class, function (InterviewReminderMail $mail) use ($interview, $expectedQueue) {
-                return $mail->interview->is($interview)
-                    && $mail->slot === 'thirty_minutes'
-                    && $mail->queue === $expectedQueue;
-            });
-
-            $this->assertTrue($interview->fresh()->remind_30m_sent);
+            $this->assertSame(0, Notification::count());
+            Mail::assertNothingQueued();
+            $this->assertFalse($interview->fresh()->remind_30m_sent);
         } finally {
             CarbonImmutable::setTestNow();
         }
@@ -151,7 +221,7 @@ class SendInterviewReminderJobTest extends TestCase
     public function test_job_skips_when_no_recipients_available(): void
     {
         Mail::fake();
-        CarbonImmutable::setTestNow(CarbonImmutable::parse('2025-10-01 09:00:00', 'Asia/Tokyo'));
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2025-10-01 09:30:00', 'Asia/Tokyo'));
 
         try {
             $this->seedBaselineData();
@@ -179,7 +249,7 @@ class SendInterviewReminderJobTest extends TestCase
 
             Mail::assertNothingQueued();
 
-            $this->assertFalse($interview->fresh()->remind_1h_sent);
+            $this->assertFalse($interview->fresh()->remind_30m_sent);
         } finally {
             CarbonImmutable::setTestNow();
         }

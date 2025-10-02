@@ -124,25 +124,31 @@ class SendInterviewReminderJob implements ShouldQueue
     protected function buildToAddresses(Interview $interview): array
     {
         $candidate = $interview->candidate;
+        $ownerEmail = optional($candidate->createdBy)->email;
 
         $addresses = $candidate->handlerCollection()
             ->pluck('email')
-            ->when(optional($candidate->agency)->email, fn ($collection, $email) => $collection->push($email))
             ->filter()
             ->map(fn ($email) => trim($email))
-            ->filter()
-            ->unique()
-            ->values();
+            ->filter();
 
-        if ($addresses->isEmpty()) {
-            $ownerEmail = optional($candidate->createdBy)->email;
+        $agencyEmail = optional($candidate->agency)->email;
 
-            if ($ownerEmail) {
-                $addresses->push(trim($ownerEmail));
-            }
+        if ($agencyEmail) {
+            $addresses->push(trim($agencyEmail));
         }
 
-        return $addresses->unique()->values()->all();
+        if ($ownerEmail) {
+            $trimmedOwner = trim($ownerEmail);
+
+            $addresses = $addresses->reject(fn ($email) => strcasecmp($email, $trimmedOwner) === 0);
+        }
+
+        return $addresses
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     protected function buildCcAddresses(Interview $interview): array
@@ -154,7 +160,9 @@ class SendInterviewReminderJob implements ShouldQueue
         $ownerEmail = optional($interview->candidate->createdBy)->email;
 
         if ($ownerEmail) {
-            $cc->push($ownerEmail);
+            $trimmedOwner = trim($ownerEmail);
+
+            $cc = $cc->reject(fn ($email) => strcasecmp($email, $trimmedOwner) === 0);
         }
 
         return $cc
@@ -165,12 +173,10 @@ class SendInterviewReminderJob implements ShouldQueue
 
     protected function markSent(Interview $interview, string $slot): void
     {
-        $flagColumn = match ($slot) {
-            'prev_day' => 'remind_prev_day_sent',
-            'one_hour' => 'remind_1h_sent',
-            'thirty_minutes' => 'remind_30m_sent',
-        };
+        if ($slot !== 'thirty_minutes') {
+            return;
+        }
 
-        $interview->forceFill([$flagColumn => true])->save();
+        $interview->forceFill(['remind_30m_sent' => true])->save();
     }
 }

@@ -62,8 +62,6 @@ class InterviewReminderMail extends Mailable implements ShouldQueue
     protected function slotLabel(string $slot): string
     {
         return match ($slot) {
-            'prev_day' => '前日 9:00 リマインド',
-            'one_hour' => '1時間前リマインド',
             'thirty_minutes' => '30分前リマインド',
             default => 'リマインド',
         };
