@@ -88,6 +88,35 @@ class CandidateNotificationTest extends TestCase
         });
     }
 
+    public function test_store_rejects_duplicate_wish_jobs(): void
+    {
+        $user = User::factory()->create();
+        $handler = User::factory()->create();
+        ['agency' => $agency, 'status' => $status, 'job' => $job] = $this->seedLookups();
+
+        $payload = [
+            'name' => '重複検証候補者',
+            'name_kana' => 'ジュウフクケンショウコウホシャ',
+            'agency_id' => $agency->id,
+            'introduced_on' => Carbon::today()->toDateString(),
+            'wish_job1' => $job->id,
+            'wish_job2' => $job->id,
+            'wish_job3' => null,
+            'handler1' => $handler->id,
+            'handler2' => null,
+            'status' => $status->code,
+            'status_changed_on' => Carbon::today()->toDateString(),
+            'remind_30m_enabled' => '1',
+        ];
+
+        $response = $this->actingAs($user)->post(route('candidates.store'), $payload);
+
+        $response
+            ->assertSessionHasErrors(['wish_job1' => '希望職種は重複しないよう選択してください。']);
+
+        $this->assertSame(0, Candidate::count());
+    }
+
     public function test_update_skips_notification_when_not_requested(): void
     {
         Mail::fake();

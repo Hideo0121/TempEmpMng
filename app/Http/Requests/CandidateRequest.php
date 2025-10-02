@@ -116,6 +116,16 @@ class CandidateRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator) {
+            $wishJobs = collect([
+                $this->input('wish_job1'),
+                $this->input('wish_job2'),
+                $this->input('wish_job3'),
+            ])->filter();
+
+            if ($wishJobs->count() !== $wishJobs->unique()->count()) {
+                $validator->errors()->add('wish_job1', '希望職種は重複しないよう選択してください。');
+            }
+
             foreach (range(1, 3) as $index) {
                 $timeKey = "visit_candidate{$index}_time";
                 $dateKey = "visit_candidate{$index}_date";
