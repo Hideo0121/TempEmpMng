@@ -28,6 +28,7 @@ class RecruitmentStatusController extends Controller
         $categories = JobCategory::query()
             ->with('recruitmentInfo')
             ->where('is_active', true)
+            ->where('name', '!=', '短期')
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get()
