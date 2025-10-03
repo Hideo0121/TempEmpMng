@@ -43,11 +43,15 @@ class CandidateController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
-        $agencies = Agency::query()->orderBy('name')->get();
-        $statuses = CandidateStatus::query()->orderBy('sort_order')->get();
-        $handlers = User::query()->where('is_active', true)->orderBy('name')->get();
-        $jobCategories = JobCategory::query()->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get();
-        $employedStatusCodes = CandidateStatus::employedCodes();
+    $agencies = Agency::query()->orderBy('name')->get();
+    $statuses = CandidateStatus::query()->orderBy('sort_order')->get();
+    $handlers = User::query()->where('is_active', true)->orderBy('name')->get();
+    $jobCategories = JobCategory::query()->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get();
+    $employedStatusCodes = CandidateStatus::employedCodes();
+
+    $selectedAgencies = $this->normalizeIdValues($request->input('agency'));
+    $selectedWishJobs = $this->normalizeIdValues($request->input('wish_job'));
+    $selectedDecidedJobs = $this->normalizeIdValues($request->input('decided_job'));
 
         return view('candidates.index', [
             'candidates' => $candidates,
@@ -58,9 +62,9 @@ class CandidateController extends Controller
             'employedStatusCodes' => $employedStatusCodes,
             'filters' => [
                 'keyword' => $request->input('keyword'),
-                'agency' => $request->input('agency'),
-                'wish_job' => $request->input('wish_job'),
-                'decided_job' => $request->input('decided_job'),
+                'agency' => $selectedAgencies,
+                'wish_job' => $selectedWishJobs,
+                'decided_job' => $selectedDecidedJobs,
                 'status' => (array) $request->input('status', []),
                 'introduced_from' => $request->input('introduced_from'),
                 'introduced_to' => $request->input('introduced_to'),
@@ -186,20 +190,23 @@ class CandidateController extends Controller
             });
         }
 
-        if ($agencyId = $request->integer('agency')) {
-            $query->where('agency_id', $agencyId);
+        $agencyIds = $this->normalizeIdValues($request->input('agency'));
+        if (!empty($agencyIds)) {
+            $query->whereIn('agency_id', $agencyIds);
         }
 
-        if ($wishJobId = $request->integer('wish_job')) {
-            $query->where(function ($inner) use ($wishJobId) {
-                $inner->where('wish_job1_id', $wishJobId)
-                    ->orWhere('wish_job2_id', $wishJobId)
-                    ->orWhere('wish_job3_id', $wishJobId);
+        $wishJobIds = $this->normalizeIdValues($request->input('wish_job'));
+        if (!empty($wishJobIds)) {
+            $query->where(function ($inner) use ($wishJobIds) {
+                $inner->whereIn('wish_job1_id', $wishJobIds)
+                    ->orWhereIn('wish_job2_id', $wishJobIds)
+                    ->orWhereIn('wish_job3_id', $wishJobIds);
             });
         }
 
-        if ($decidedJobId = $request->integer('decided_job')) {
-            $query->where('decided_job_category_id', $decidedJobId);
+        $decidedJobIds = $this->normalizeIdValues($request->input('decided_job'));
+        if (!empty($decidedJobIds)) {
+            $query->whereIn('decided_job_category_id', $decidedJobIds);
         }
 
         $statuses = array_filter((array) $request->input('status', []));
@@ -836,6 +843,33 @@ class CandidateController extends Controller
 
         $view->last_viewed_at = $now;
         $view->save();
+    }
+
+    private function normalizeIdValues(mixed $value): array
+    {
+        if ($value === null) {
+            return [];
+        }
+
+        $items = is_array($value) ? $value : [$value];
+
+        $ids = [];
+        foreach ($items as $item) {
+            if ($item === null || $item === '') {
+                continue;
+            }
+
+            if (is_numeric($item)) {
+                $ids[] = (int) $item;
+                continue;
+            }
+
+            if (is_string($item) && ctype_digit($item)) {
+                $ids[] = (int) $item;
+            }
+        }
+
+        return array_values(array_unique($ids));
     }
 
     protected function resolvePerPage(Request $request): int

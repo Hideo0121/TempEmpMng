@@ -110,7 +110,7 @@ class CandidateFiltersTest extends TestCase
         $this->createCandidate($user, $agency, $status, $jobA, '事務希望');
         $this->createCandidate($user, $agency, $status, $jobB, '販売希望');
 
-        $response = $this->actingAs($user)->get(route('candidates.index', ['wish_job' => $jobA->id]));
+    $response = $this->actingAs($user)->get(route('candidates.index', ['wish_job' => [$jobA->id]]));
 
         $response->assertOk();
         $response->assertSeeText('事務希望');
@@ -253,7 +253,7 @@ class CandidateFiltersTest extends TestCase
         $this->createCandidate($user, $agency, $entryStatus, $jobA, 'エントリーA');
         $this->createCandidate($user, $agency, $employedStatus, $jobB, '就業決定B', $jobB);
 
-        $response = $this->actingAs($user)->get(route('candidates.index', ['decided_job' => $jobB->id]));
+    $response = $this->actingAs($user)->get(route('candidates.index', ['decided_job' => [$jobB->id]]));
 
         $response->assertOk();
         $response->assertSeeText('就業決定B');

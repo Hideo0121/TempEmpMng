@@ -52,6 +52,29 @@
     $currentPerPage = (int) ($filters['per_page'] ?? ($perPageOptions[0] ?? 10));
     $namesParameters = request()->except('page');
     $namesUrl = route('candidates.names', $namesParameters, false);
+    $multiSelectSummary = static function (array $selected, $options, string $idKey = 'id', string $labelKey = 'name'): string {
+        if (empty($selected)) {
+            return 'すべて';
+        }
+
+        $labels = [];
+        foreach ($options as $option) {
+            $id = is_object($option) ? $option->{$idKey} : ($option[$idKey] ?? null);
+            if ($id === null) {
+                continue;
+            }
+
+            if (in_array((int) $id, $selected, true)) {
+                $labels[] = is_object($option) ? $option->{$labelKey} : ($option[$labelKey] ?? (string) $id);
+            }
+        }
+
+        if (empty($labels)) {
+            return 'すべて';
+        }
+
+        return count($labels) <= 2 ? implode('・', $labels) : count($labels) . '件選択';
+    };
 @endphp
 
 @section('pageTitle', '紹介者一覧')
@@ -68,36 +91,87 @@
             </div>
 
             <div class="lg:col-span-2">
-                <label class="block text-sm font-semibold text-slate-700" for="agency">派遣会社</label>
-                <select id="agency" name="agency"
-                    class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                    <option value="">すべて</option>
-                    @foreach ($agencies as $agency)
-                        <option value="{{ $agency->id }}" @selected((string) $filters['agency'] === (string) $agency->id)>{{ $agency->name }}</option>
-                    @endforeach
-                </select>
+                <span class="block text-sm font-semibold text-slate-700">派遣会社</span>
+                @php
+                    $agencySummary = $multiSelectSummary($filters['agency'], $agencies);
+                @endphp
+                <div class="mt-1 relative" data-multiselect>
+                    <button type="button" class="flex w-full items-center justify-between rounded-xl border border-slate-300 bg-white px-4 py-2 text-left text-sm font-medium text-slate-700 shadow-sm transition hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-200" data-multiselect-toggle data-placeholder="すべて" aria-haspopup="listbox" aria-expanded="false">
+                        <span data-multiselect-summary>{{ $agencySummary }}</span>
+                        <svg class="h-4 w-4 text-slate-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 011.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    <div class="absolute left-0 right-0 z-30 mt-2 hidden rounded-xl border border-slate-200 bg-white p-2 shadow-xl top-full" data-multiselect-panel>
+                        <div class="max-h-56 overflow-y-auto py-1">
+                            @foreach ($agencies as $agency)
+                                <label class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">
+                                    <input type="checkbox" name="agency[]" value="{{ $agency->id }}" @checked(in_array($agency->id, $filters['agency'], true)) data-option-label="{{ $agency->name }}" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                    <span>{{ $agency->name }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                        <div class="border-t border-slate-200 pt-2 text-right">
+                            <button type="button" class="text-sm font-semibold text-blue-600 hover:text-blue-500" data-multiselect-clear>選択をクリア</button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="lg:col-span-2">
-                <label class="block text-sm font-semibold text-slate-700" for="wish_job">希望職種</label>
-                <select id="wish_job" name="wish_job"
-                    class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                    <option value="">すべて</option>
-                    @foreach ($jobCategories as $jobCategory)
-                        <option value="{{ $jobCategory->id }}" @selected((string) $filters['wish_job'] === (string) $jobCategory->id)>{{ $jobCategory->name }}</option>
-                    @endforeach
-                </select>
+                <span class="block text-sm font-semibold text-slate-700">希望職種</span>
+                @php
+                    $wishJobSummary = $multiSelectSummary($filters['wish_job'], $jobCategories);
+                @endphp
+                <div class="mt-1 relative" data-multiselect>
+                    <button type="button" class="flex w-full items-center justify-between rounded-xl border border-slate-300 bg-white px-4 py-2 text-left text-sm font-medium text-slate-700 shadow-sm transition hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-200" data-multiselect-toggle data-placeholder="すべて" aria-haspopup="listbox" aria-expanded="false">
+                        <span data-multiselect-summary>{{ $wishJobSummary }}</span>
+                        <svg class="h-4 w-4 text-slate-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 011.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    <div class="absolute left-0 right-0 z-30 mt-2 hidden rounded-xl border border-slate-200 bg-white p-2 shadow-xl top-full" data-multiselect-panel>
+                        <div class="max-h-56 overflow-y-auto py-1">
+                            @foreach ($jobCategories as $jobCategory)
+                                <label class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">
+                                    <input type="checkbox" name="wish_job[]" value="{{ $jobCategory->id }}" @checked(in_array($jobCategory->id, $filters['wish_job'], true)) data-option-label="{{ $jobCategory->name }}" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                    <span>{{ $jobCategory->name }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                        <div class="border-t border-slate-200 pt-2 text-right">
+                            <button type="button" class="text-sm font-semibold text-blue-600 hover:text-blue-500" data-multiselect-clear>選択をクリア</button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="lg:col-span-2">
-                <label class="block text-sm font-semibold text-slate-700" for="decided_job">就業する職種</label>
-                <select id="decided_job" name="decided_job"
-                    class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                    <option value="">すべて</option>
-                    @foreach ($jobCategories as $jobCategory)
-                        <option value="{{ $jobCategory->id }}" @selected((string) $filters['decided_job'] === (string) $jobCategory->id)>{{ $jobCategory->name }}</option>
-                    @endforeach
-                </select>
+                <span class="block text-sm font-semibold text-slate-700">就業する職種</span>
+                @php
+                    $decidedJobSummary = $multiSelectSummary($filters['decided_job'], $jobCategories);
+                @endphp
+                <div class="mt-1 relative" data-multiselect>
+                    <button type="button" class="flex w-full items-center justify-between rounded-xl border border-slate-300 bg-white px-4 py-2 text-left text-sm font-medium text-slate-700 shadow-sm transition hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-200" data-multiselect-toggle data-placeholder="すべて" aria-haspopup="listbox" aria-expanded="false">
+                        <span data-multiselect-summary>{{ $decidedJobSummary }}</span>
+                        <svg class="h-4 w-4 text-slate-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 011.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    <div class="absolute left-0 right-0 z-30 mt-2 hidden rounded-xl border border-slate-200 bg-white p-2 shadow-xl top-full" data-multiselect-panel>
+                        <div class="max-h-56 overflow-y-auto py-1">
+                            @foreach ($jobCategories as $jobCategory)
+                                <label class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">
+                                    <input type="checkbox" name="decided_job[]" value="{{ $jobCategory->id }}" @checked(in_array($jobCategory->id, $filters['decided_job'], true)) data-option-label="{{ $jobCategory->name }}" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                    <span>{{ $jobCategory->name }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                        <div class="border-t border-slate-200 pt-2 text-right">
+                            <button type="button" class="text-sm font-semibold text-blue-600 hover:text-blue-500" data-multiselect-clear>選択をクリア</button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="lg:col-span-3">
@@ -494,6 +568,96 @@
 
             wireDateRangeAutoFill('input[name="introduced_from"]', 'input[name="introduced_to"]');
             wireDateRangeAutoFill('input[name="interview_from"]', 'input[name="interview_to"]');
+
+            const initMultiSelect = (root) => {
+                const toggle = root.querySelector('[data-multiselect-toggle]');
+                const panel = root.querySelector('[data-multiselect-panel]');
+                const summary = root.querySelector('[data-multiselect-summary]');
+                const clearButton = root.querySelector('[data-multiselect-clear]');
+                const checkboxes = Array.from(root.querySelectorAll('input[type="checkbox"]'));
+                const placeholder = toggle?.dataset.placeholder || 'すべて';
+
+                if (!toggle || !panel || !summary) {
+                    return;
+                }
+
+                const updateSummary = () => {
+                    const checked = checkboxes.filter((checkbox) => checkbox.checked);
+
+                    if (checked.length === 0) {
+                        summary.textContent = placeholder;
+                        return;
+                    }
+
+                    const labels = checked.map((checkbox) => checkbox.dataset.optionLabel || checkbox.value);
+                    summary.textContent = labels.length <= 2 ? labels.join('・') : `${labels.length}件選択`;
+                };
+
+                const handleDocumentClick = (event) => {
+                    if (!root.contains(event.target)) {
+                        closePanel();
+                    }
+                };
+
+                const closePanel = () => {
+                    if (panel.classList.contains('hidden')) {
+                        return;
+                    }
+
+                    panel.classList.add('hidden');
+                    toggle.setAttribute('aria-expanded', 'false');
+                    document.removeEventListener('click', handleDocumentClick, true);
+                };
+
+                const openPanel = () => {
+                    if (!panel.classList.contains('hidden')) {
+                        return;
+                    }
+
+                    panel.classList.remove('hidden');
+                    toggle.setAttribute('aria-expanded', 'true');
+                    document.addEventListener('click', handleDocumentClick, true);
+                };
+
+                toggle.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    if (panel.classList.contains('hidden')) {
+                        openPanel();
+                    } else {
+                        closePanel();
+                    }
+                });
+
+                panel.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                });
+
+                checkboxes.forEach((checkbox) => {
+                    checkbox.addEventListener('change', () => {
+                        updateSummary();
+                    });
+                });
+
+                if (clearButton) {
+                    clearButton.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        checkboxes.forEach((checkbox) => {
+                            checkbox.checked = false;
+                        });
+                        updateSummary();
+                    });
+                }
+
+                updateSummary();
+
+                root.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape') {
+                        closePanel();
+                    }
+                });
+            };
+
+            document.querySelectorAll('[data-multiselect]').forEach((root) => initMultiSelect(root));
 
             const copyNamesButton = document.querySelector('[data-copy-names]');
             if (copyNamesButton) {
