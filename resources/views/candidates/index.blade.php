@@ -471,6 +471,30 @@
                 });
             }
 
+            const wireDateRangeAutoFill = (startSelector, endSelector) => {
+                const startInput = document.querySelector(startSelector);
+                const endInput = document.querySelector(endSelector);
+
+                if (!startInput || !endInput) {
+                    return;
+                }
+
+                startInput.addEventListener('change', () => {
+                    const value = startInput.value;
+
+                    if (!value) {
+                        return;
+                    }
+
+                    if (!endInput.value || endInput.value < value) {
+                        endInput.value = value;
+                    }
+                });
+            };
+
+            wireDateRangeAutoFill('input[name="introduced_from"]', 'input[name="introduced_to"]');
+            wireDateRangeAutoFill('input[name="interview_from"]', 'input[name="interview_to"]');
+
             const copyNamesButton = document.querySelector('[data-copy-names]');
             if (copyNamesButton) {
                 const originalLabel = copyNamesButton.textContent.trim();
