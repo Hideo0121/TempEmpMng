@@ -4,7 +4,22 @@
 @section('pageDescription', '希望職種・ステータス・派遣会社・ユーザのマスタを最新状態に保ちます。')
 
 @section('content')
-    <section class="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+    <section class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+        <article class="flex flex-col justify-between rounded-3xl border border-blue-100 bg-white p-6 shadow-md transition hover:-translate-y-1 hover:shadow-lg">
+            <div class="space-y-3">
+                <p class="text-sm font-semibold uppercase tracking-wide text-blue-600">Recruitment Info</p>
+                <h2 class="text-2xl font-semibold text-slate-900">募集情報マスタ</h2>
+                <p class="text-sm text-slate-600">公開ページと連動する募集人数とコメントを編集し、外部公開の内容を即時に更新できます。</p>
+            </div>
+            <div class="mt-6 flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <span class="inline-flex items-center gap-2 rounded-full bg-blue-50 px-4 py-1 font-semibold text-blue-700">公開ページとリアルタイム連携</span>
+                <div class="flex flex-col gap-2 sm:flex-row">
+                    <a href="{{ route('masters.recruitment-info.index') }}" class="inline-flex items-center justify-center rounded-full bg-blue-600 px-5 py-2 font-semibold text-white transition hover:bg-blue-500">一覧へ</a>
+                    <a href="{{ route('recruitment.status') }}" target="_blank" rel="noopener" class="inline-flex items-center justify-center rounded-full border border-blue-200 px-5 py-2 font-semibold text-blue-600 transition hover:bg-blue-50">公開ページを見る</a>
+                </div>
+            </div>
+        </article>
+
         <article class="flex flex-col justify-between rounded-3xl bg-white p-6 shadow-md transition hover:-translate-y-1 hover:shadow-lg">
             <div>
                 <p class="text-sm font-semibold text-blue-600">Job Categories</p>

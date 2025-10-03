@@ -68,6 +68,8 @@
                         <th class="px-4 py-2 text-left whitespace-nowrap">名称</th>
                         <th class="px-4 py-2 text-left whitespace-nowrap">表示順</th>
                         <th class="px-4 py-2 text-left whitespace-nowrap">状態</th>
+                        <th class="px-4 py-2 text-left whitespace-nowrap">募集人数</th>
+                        <th class="px-4 py-2 text-left">募集コメント</th>
                         <th class="px-4 py-2 text-left whitespace-nowrap">最終更新</th>
                         <th class="px-4 py-2 text-left whitespace-nowrap">操作</th>
                     </tr>
@@ -86,6 +88,16 @@
                                     <span class="inline-flex items-center rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-600">停止中</span>
                                 @endif
                             </td>
+                            <td class="px-4 py-2 align-middle whitespace-nowrap text-slate-700">
+                                {{ optional($category->recruitmentInfo)->planned_hires ?? '—' }}
+                            </td>
+                            <td class="px-4 py-2 align-middle text-slate-700">
+                                @if (filled(optional($category->recruitmentInfo)->comment))
+                                    <span class="block whitespace-pre-line break-words">{{ optional($category->recruitmentInfo)->comment }}</span>
+                                @else
+                                    <span class="text-slate-400">—</span>
+                                @endif
+                            </td>
                             <td class="px-4 py-2 align-middle whitespace-nowrap text-slate-700">{{ optional($category->updated_at)->format('Y/m/d H:i') }}</td>
                             <td class="px-4 py-2 align-middle whitespace-nowrap">
                                 <a href="{{ route('masters.job-categories.edit', $category) }}" class="inline-flex items-center gap-1 rounded-full border border-blue-200 px-3 py-1 text-xs font-semibold text-blue-600 transition hover:bg-blue-50">
@@ -95,7 +107,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-4 py-6 text-center text-slate-500">登録済みの希望職種がありません。</td>
+                            <td colspan="7" class="px-4 py-6 text-center text-slate-500">登録済みの希望職種がありません。</td>
                         </tr>
                     @endforelse
                 </tbody>

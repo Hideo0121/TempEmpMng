@@ -8,7 +8,11 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Master\AgencyController;
 use App\Http\Controllers\Master\CandidateStatusController;
 use App\Http\Controllers\Master\JobCategoryController;
+use App\Http\Controllers\Master\RecruitmentInfoController;
 use App\Http\Controllers\Master\UserController;
+use App\Http\Controllers\RecruitmentStatusController;
+
+Route::get('/recruitment-status', RecruitmentStatusController::class)->name('recruitment.status');
 
 Route::redirect('/', '/login');
 
@@ -39,6 +43,9 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('manager')->prefix('masters')->name('masters.')->group(function () {
         Route::view('/', 'masters.index')->name('index');
+        Route::resource('recruitment-info', RecruitmentInfoController::class)
+            ->only(['index', 'edit', 'update'])
+            ->parameters(['recruitment-info' => 'jobCategory']);
         Route::get('job-categories/export', [JobCategoryController::class, 'export'])->name('job-categories.export');
         Route::post('job-categories/import', [JobCategoryController::class, 'import'])->name('job-categories.import');
         Route::resource('job-categories', JobCategoryController::class)->except(['show', 'destroy']);

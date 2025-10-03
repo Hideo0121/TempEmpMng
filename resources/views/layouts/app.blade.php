@@ -17,9 +17,13 @@
 </head>
 <body class="min-h-screen bg-slate-100 text-slate-800">
     <header class="bg-blue-700 text-white shadow-lg">
+    @php
+        $isRecruitmentStatus = request()->routeIs('recruitment.status');
+        $brandUrl = auth()->check() ? route('dashboard') : route('recruitment.status');
+    @endphp
     <div class="mx-auto flex max-w-[110rem] items-center justify-between px-6 py-4">
             <div class="text-xl font-semibold">
-                <a href="{{ route('dashboard') }}" class="transition hover:text-blue-100">短期派遣受入管理システム</a>
+                <a href="{{ $brandUrl }}" class="transition hover:text-blue-100">短期派遣受入管理システム</a>
             </div>
             @auth
                 <nav class="flex items-center gap-3 text-sm font-medium">
@@ -34,6 +38,13 @@
                     </form>
                 </nav>
             @endauth
+            @guest
+                @if (! $isRecruitmentStatus)
+                    <nav class="flex items-center gap-3 text-sm font-medium">
+                        <a href="{{ route('login') }}" class="inline-flex items-center justify-center rounded-full bg-white px-4 py-2 text-blue-700 transition hover:bg-blue-50">ログイン</a>
+                    </nav>
+                @endif
+            @endguest
         </div>
     </header>
 
@@ -60,7 +71,7 @@
 
     <footer class="border-t border-slate-200 bg-white">
     <div class="mx-auto flex max-w-[110rem] items-center justify-between px-6 py-4 text-xs text-slate-500">
-            <span>© {{ date('Y') }} TempEmpMng. 内部利用専用。</span>
+            <span>{{ $isRecruitmentStatus ? '© 2025' : '© ' . date('Y') . ' TempEmpMng. 内部利用専用。' }}</span>
             <span>Ver. {{ config('app.version', '0.1.0-prototype') }}</span>
         </div>
     </footer>

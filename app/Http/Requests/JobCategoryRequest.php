@@ -23,16 +23,23 @@ class JobCategoryRequest extends FormRequest
             ],
             'sort_order' => ['integer', 'min:0', 'max:65535'],
             'is_active' => ['required', 'boolean'],
+            'planned_hires' => ['nullable', 'integer', 'min:0', 'max:65535'],
+            'recruitment_comment' => ['nullable', 'string', 'max:1000'],
         ];
     }
 
     protected function prepareForValidation(): void
     {
         $sortOrder = $this->input('sort_order');
+        $plannedHires = $this->input('planned_hires');
+        $comment = $this->input('recruitment_comment');
+        $comment = is_string($comment) ? trim($comment) : $comment;
 
         $this->merge([
             'sort_order' => is_numeric($sortOrder) ? (int) $sortOrder : 0,
             'is_active' => $this->boolean('is_active'),
+            'planned_hires' => is_numeric($plannedHires) ? max(0, (int) $plannedHires) : null,
+            'recruitment_comment' => ($comment === null || $comment === '') ? null : $comment,
         ]);
     }
 }

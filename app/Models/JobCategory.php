@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+
 class JobCategory extends Model
 {
     protected $guarded = [];
@@ -11,4 +13,9 @@ class JobCategory extends Model
         'sort_order' => 'integer',
         'is_active' => 'boolean',
     ];
+
+    public function recruitmentInfo(): HasOne
+    {
+        return $this->hasOne(RecruitmentInfo::class);
+    }
 }

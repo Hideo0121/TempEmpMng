@@ -7,6 +7,7 @@ use App\Http\Controllers\Master\Concerns\HandlesCsv;
 use App\Http\Requests\JobCategoryRequest;
 use App\Http\Requests\MasterCsvImportRequest;
 use App\Models\JobCategory;
+use Illuminate\Support\Arr;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -19,6 +20,7 @@ class JobCategoryController extends Controller
     public function index(): View
     {
         $categories = JobCategory::query()
+            ->with('recruitmentInfo')
             ->orderBy('sort_order')
             ->orderBy('name')
             ->paginate(20);
@@ -38,7 +40,11 @@ class JobCategoryController extends Controller
 
     public function store(JobCategoryRequest $request): RedirectResponse
     {
-        JobCategory::create($request->validated());
+        $validated = $request->validated();
+
+        $category = JobCategory::create(Arr::only($validated, ['name', 'sort_order', 'is_active']));
+
+        $this->syncRecruitmentInfo($category, $validated);
 
         return redirect()
             ->route('masters.job-categories.index')
@@ -48,13 +54,17 @@ class JobCategoryController extends Controller
     public function edit(JobCategory $jobCategory): View
     {
         return view('masters.job-categories.edit', [
-            'category' => $jobCategory,
+            'category' => $jobCategory->loadMissing('recruitmentInfo'),
         ]);
     }
 
     public function update(JobCategoryRequest $request, JobCategory $jobCategory): RedirectResponse
     {
-        $jobCategory->update($request->validated());
+        $validated = $request->validated();
+
+        $jobCategory->update(Arr::only($validated, ['name', 'sort_order', 'is_active']));
+
+        $this->syncRecruitmentInfo($jobCategory, $validated);
 
         return redirect()
             ->route('masters.job-categories.index')
@@ -195,5 +205,19 @@ class JobCategoryController extends Controller
         return redirect()
             ->route('masters.job-categories.index')
             ->with('status', 'CSVを取り込みました。（' . count($records) . '件）');
+    }
+
+    private function syncRecruitmentInfo(JobCategory $category, array $payload): void
+    {
+        $planned = $payload['planned_hires'] ?? 0;
+        $planned = is_numeric($planned) ? max(0, (int) $planned) : 0;
+        $comment = $payload['recruitment_comment'] ?? null;
+        $comment = is_string($comment) ? trim($comment) : $comment;
+        $comment = $comment === '' ? null : $comment;
+
+        $category->recruitmentInfo()->updateOrCreate([], [
+            'planned_hires' => $planned,
+            'comment' => $comment,
+        ]);
     }
 }
