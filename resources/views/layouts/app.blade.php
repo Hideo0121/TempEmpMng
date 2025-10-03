@@ -27,15 +27,19 @@
             </div>
             @auth
                 <nav class="flex items-center gap-3 text-sm font-medium">
-                    <a href="{{ route('candidates.create') }}" class="inline-flex items-center justify-center rounded-full bg-white/10 px-4 py-2 transition hover:bg-white/20">紹介者登録</a>
-                    <a href="{{ route('candidates.index') }}" class="inline-flex items-center justify-center rounded-full bg-white/10 px-4 py-2 transition hover:bg-white/20">紹介者一覧</a>
-                    @if (auth()->user()?->isManager())
+                    @if (! $isRecruitmentStatus)
+                        <a href="{{ route('candidates.create') }}" class="inline-flex items-center justify-center rounded-full bg-white/10 px-4 py-2 transition hover:bg-white/20">紹介者登録</a>
+                        <a href="{{ route('candidates.index') }}" class="inline-flex items-center justify-center rounded-full bg-white/10 px-4 py-2 transition hover:bg-white/20">紹介者一覧</a>
+                    @endif
+                    @if (auth()->user()?->isManager() && ! $isRecruitmentStatus)
                         <a href="{{ route('masters.index') }}" class="inline-flex items-center justify-center rounded-full bg-white/10 px-4 py-2 transition hover:bg-white/20">マスタ管理</a>
                     @endif
-                    <form method="POST" action="{{ route('logout') }}" class="contents">
-                        @csrf
-                        <button type="submit" class="inline-flex items-center justify-center rounded-full bg-white px-4 py-2 text-blue-700 transition hover:bg-blue-50">ログアウト</button>
-                    </form>
+                    @if (! $isRecruitmentStatus)
+                        <form method="POST" action="{{ route('logout') }}" class="contents">
+                            @csrf
+                            <button type="submit" class="inline-flex items-center justify-center rounded-full bg-white px-4 py-2 text-blue-700 transition hover:bg-blue-50">ログアウト</button>
+                        </form>
+                    @endif
                 </nav>
             @endauth
             @guest
@@ -75,5 +79,7 @@
             <span>Ver. {{ config('app.version', '0.1.0-prototype') }}</span>
         </div>
     </footer>
+
+    @stack('scripts')
 </body>
 </html>

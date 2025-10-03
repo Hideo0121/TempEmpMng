@@ -14,7 +14,7 @@ use App\Http\Controllers\RecruitmentStatusController;
 
 Route::get('/recruitment-status', RecruitmentStatusController::class)->name('recruitment.status');
 
-Route::redirect('/', '/login');
+Route::redirect('/', '/recruitment-status');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');

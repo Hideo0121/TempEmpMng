@@ -11,12 +11,16 @@
 @section('content')
     <div class="mx-auto w-full max-w-3xl px-4 sm:px-0">
         <section class="rounded-3xl bg-white p-5 shadow-md sm:p-6">
-            <header class="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <header class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 class="text-lg font-semibold text-slate-900">職種別 募集枠一覧</h2>
                     <p class="text-sm text-slate-500">募集人数と現状の就業決定人数を表示しています。残り枠が1名の職種は淡いオレンジ、充足済みはグレーで表示します。</p>
                 </div>
-                <div class="text-xs text-slate-400">更新日時: {{ now()->format('Y/m/d H:i') }} 現在</div>
+                <div class="flex flex-col items-start gap-2 text-xs text-slate-400 sm:items-end sm:text-right">
+                    <button type="button" id="recruitment-refresh-button" class="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">最新情報に更新</button>
+                    <span class="whitespace-nowrap">{{ now()->format('Y/m/d H:i') }} 現在</span>
+                    <span id="recruitment-refresh-warning" class="hidden text-amber-500">10秒以内の再読み込みはできません。</span>
+                </div>
             </header>
 
             <div class="overflow-x-auto">
@@ -34,20 +38,31 @@
                     @forelse ($categories as $category)
                         @php
                             $difference = $category['difference'];
+                            $planned = (int) $category['planned'];
                             $remaining = max($difference, 0);
 
                             if ($difference < 0) {
                                 $rowClass = 'bg-rose-100/80';
                             } elseif ($difference === 0) {
                                 $rowClass = 'bg-slate-200/80';
-                            } elseif ($difference === 1) {
+                            } elseif ($difference === 1 && $planned >= 2) {
                                 $rowClass = 'bg-amber-100/80';
                             } else {
                                 $rowClass = 'bg-white';
                             }
                         @endphp
                         <tr class="transition hover:bg-blue-50/60 {{ $rowClass }}">
-                            <td class="px-4 py-3 font-semibold text-slate-900">{{ $category['name'] }}</td>
+                            @php
+                                $nameParts = explode('(', $category['name'], 2);
+                            @endphp
+                            <td class="px-4 py-3 font-semibold text-slate-900">
+                                @if (count($nameParts) === 2)
+                                    <span class="block">{{ $nameParts[0] }}</span>
+                                    <span class="block">({{ $nameParts[1] }}</span>
+                                @else
+                                    {{ $category['name'] }}
+                                @endif
+                            </td>
                             <td class="px-4 py-3 text-right text-slate-700">{{ number_format($category['planned']) }}</td>
                             <td class="px-4 py-3 text-right text-slate-700">{{ number_format($category['decided']) }}</td>
                             <td class="px-4 py-3 text-right text-slate-700">{{ number_format($remaining) }}</td>
@@ -55,7 +70,7 @@
                                 @if (filled($category['comment']))
                                     <span class="whitespace-pre-line">{{ $category['comment'] }}</span>
                                 @else
-                                    <span class="text-slate-400">コメント未設定</span>
+                                    <span class="text-slate-400">----</span>
                                 @endif
                             </td>
                         </tr>
@@ -74,3 +89,55 @@
         </section>
     </div>
 @endsection
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const refreshButton = document.getElementById('recruitment-refresh-button');
+            if (!refreshButton) {
+                return;
+            }
+
+            const warning = document.getElementById('recruitment-refresh-warning');
+            const STORAGE_KEY = 'recruitment-status:last-refresh';
+            const COOLDOWN = 10_000; // 10 seconds
+            let hideTimer = null;
+
+            const showWarning = (remainingMs) => {
+                if (!warning) {
+                    return;
+                }
+
+                const seconds = Math.ceil(remainingMs / 1000);
+                warning.textContent = `10秒以内の再読み込みはできません（あと${seconds}秒）`;
+                warning.classList.remove('hidden');
+
+                if (hideTimer) {
+                    clearTimeout(hideTimer);
+                }
+                hideTimer = window.setTimeout(() => {
+                    warning.classList.add('hidden');
+                }, 3000);
+            };
+
+            refreshButton.addEventListener('click', () => {
+                const now = Date.now();
+                const last = Number(sessionStorage.getItem(STORAGE_KEY));
+
+                if (!Number.isNaN(last) && last > 0) {
+                    const elapsed = now - last;
+                    if (elapsed < COOLDOWN) {
+                        showWarning(COOLDOWN - elapsed);
+                        return;
+                    }
+                }
+
+                sessionStorage.setItem(STORAGE_KEY, String(now));
+                if (warning) {
+                    warning.classList.add('hidden');
+                }
+                window.location.reload();
+            });
+        });
+    </script>
+@endpush
