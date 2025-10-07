@@ -30,6 +30,8 @@ class CandidateAssignmentMail extends Mailable implements ShouldQueue
             'wishJob1',
             'wishJob2',
             'wishJob3',
+            'handler1',
+            'handler2',
         ]);
 
         $actionLabel = $this->isUpdate ? '更新' : '登録';
@@ -41,6 +43,7 @@ class CandidateAssignmentMail extends Mailable implements ShouldQueue
                 'recipient' => $this->recipient,
                 'isUpdate' => $this->isUpdate,
                 'triggeredBy' => $this->triggeredBy,
+                'handlerContacts' => $this->candidate->handlerCollection(),
                 'candidateUrl' => route('candidates.show', $this->candidate),
                 'actionLabel' => $actionLabel,
             ]);

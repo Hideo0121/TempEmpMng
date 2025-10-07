@@ -24,8 +24,8 @@ $wishJobs = [
 - 現在ステータス: {{ optional($candidate->status)->label ?? '未設定' }}
 @endcomponent
 
-@if ($triggeredBy)
-職場見学対応: {{ $triggeredBy->name }} &lt;{{ $triggeredBy->email }}&gt;
+@if ($handlerContacts->isNotEmpty())
+職場見学対応:@foreach ($handlerContacts as $handler){{ $loop->first ? ' ' : '、' }}{{ $handler->name }} &lt;{{ $handler->email }}&gt;@endforeach
 @endif
 
 @component('mail::button', ['url' => $candidateUrl])

@@ -7,7 +7,7 @@
     <section class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         <article class="flex flex-col justify-between rounded-3xl border border-blue-100 bg-white p-6 shadow-md transition hover:-translate-y-1 hover:shadow-lg">
             <div class="space-y-3">
-                <p class="text-sm font-semibold uppercase tracking-wide text-blue-600">Recruitment Info</p>
+                <p class="text-sm font-semibold text-blue-600">Recruitment Info</p>
                 <h2 class="text-2xl font-semibold text-slate-900">募集情報マスタ</h2>
                 <p class="text-sm text-slate-600">公開ページと連動する募集人数とコメントを編集し、外部公開の内容を即時に更新できます。</p>
             </div>
