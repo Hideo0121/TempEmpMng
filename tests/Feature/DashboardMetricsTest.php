@@ -108,6 +108,7 @@ class DashboardMetricsTest extends TestCase
             'handler1_user_id' => $user->id,
             'status_code' => $statusEmployed->code,
             'status_changed_on' => Carbon::today(),
+            'employment_start_at' => Carbon::today()->addDays(3)->setTime(10, 0),
             'created_by' => $user->id,
             'updated_by' => $user->id,
         ]);
@@ -130,9 +131,11 @@ class DashboardMetricsTest extends TestCase
         $response->assertViewHas('todayVisitCount', 1);
         $response->assertViewHas('wishJobGrandTotal', 3);
         $response->assertViewHas('handlerGrandTotal', 2);
+    $response->assertViewHas('employmentStartGrandTotal', 1);
 
         $response->assertSeeText('希望職種 × ステータス集計');
         $response->assertSeeText('対応者 × 見学確定日集計');
+    $response->assertSeeText('就業開始 × 職種集計');
         $response->assertSeeText($jobOffice->name);
         $response->assertSeeText($jobSales->name);
         $response->assertSeeText('就業決定');

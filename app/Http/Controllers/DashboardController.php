@@ -133,6 +133,44 @@ class DashboardController extends Controller
             }
         }
 
+        $employmentStartStats = DB::table('candidates')
+            ->selectRaw('decided_job_category_id as job_category_id, DATE(employment_start_at) as start_date, COUNT(*) as total')
+            ->whereNotNull('decided_job_category_id')
+            ->whereNotNull('employment_start_at')
+            ->whereDate('employment_start_at', '>=', $today)
+            ->groupByRaw('decided_job_category_id, DATE(employment_start_at)')
+            ->get();
+
+        $employmentStartDates = $employmentStartStats
+            ->pluck('start_date')
+            ->unique()
+            ->sort()
+            ->map(fn (string $date) => Carbon::createFromFormat('Y-m-d', $date));
+
+        $employmentStartMatrix = [];
+        $employmentStartRowTotals = [];
+        $employmentStartColumnTotals = [];
+        foreach ($employmentStartDates as $date) {
+            $employmentStartColumnTotals[$date->toDateString()] = 0;
+        }
+        $employmentStartGrandTotal = 0;
+
+        foreach ($employmentStartStats as $stat) {
+            $dateKey = $stat->start_date;
+            $jobCategoryId = (int) $stat->job_category_id;
+            $total = (int) $stat->total;
+
+            $employmentStartMatrix[$jobCategoryId][$dateKey] = $total;
+            $employmentStartRowTotals[$jobCategoryId] = ($employmentStartRowTotals[$jobCategoryId] ?? 0) + $total;
+            $employmentStartColumnTotals[$dateKey] = ($employmentStartColumnTotals[$dateKey] ?? 0) + $total;
+            $employmentStartGrandTotal += $total;
+        }
+
+        $employmentStartCategoryIds = array_keys($employmentStartMatrix);
+        $employmentStartCategories = $jobCategories
+            ->filter(fn ($jobCategory) => in_array($jobCategory->id, $employmentStartCategoryIds, true))
+            ->values();
+
         return view('dashboard', [
             'today' => $today,
             'todayVisitCount' => $todayVisitCount,
@@ -148,6 +186,12 @@ class DashboardController extends Controller
             'handlerRowTotals' => $handlerRowTotals,
             'visitDateTotals' => $visitDateTotals,
             'handlerGrandTotal' => $handlerGrandTotal,
+            'employmentStartCategories' => $employmentStartCategories,
+            'employmentStartDates' => $employmentStartDates,
+            'employmentStartMatrix' => $employmentStartMatrix,
+            'employmentStartRowTotals' => $employmentStartRowTotals,
+            'employmentStartColumnTotals' => $employmentStartColumnTotals,
+            'employmentStartGrandTotal' => $employmentStartGrandTotal,
         ]);
     }
 }

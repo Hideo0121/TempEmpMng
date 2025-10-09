@@ -172,5 +172,61 @@
             @endif
             <p class="mt-4 text-xs text-slate-400">※ 対応者の第1・第2担当に登録されているユーザーを集計対象とし、重複する担当者は1件としてカウントしています。</p>
         </article>
+
+        <article class="rounded-3xl bg-white p-6 shadow-lg lg:col-span-2">
+            <header class="flex items-center justify-between border-b border-slate-200 pb-4">
+                <div>
+                    <h3 class="text-lg font-semibold text-slate-900">就業開始 × 職種集計（今後）</h3>
+                    <p class="mt-1 text-xs text-slate-500">就業決定済み候補者の就業開始予定件数を職種別に表示します。開始予定のない日は表示しません。</p>
+                </div>
+                <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">総計 {{ number_format($employmentStartGrandTotal) }} 件</span>
+            </header>
+            @php
+                $employmentStartDateKeys = $employmentStartDates->map->toDateString();
+                $employmentStartDisplayCategories = $employmentStartCategories->filter(fn ($category) => ($employmentStartRowTotals[$category->id] ?? 0) > 0);
+            @endphp
+            @if ($employmentStartDateKeys->isEmpty() || $employmentStartDisplayCategories->isEmpty())
+                <p class="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+                    今後の就業開始予定データがありません。
+                </p>
+            @else
+                <div class="mt-6 overflow-x-auto">
+                    <table class="min-w-full divide-y divide-slate-200 text-sm">
+                        <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                            <tr>
+                                <th class="px-4 py-3 text-left">職種</th>
+                                @foreach ($employmentStartDates as $date)
+                                    <th class="px-4 py-3 text-right whitespace-nowrap">{{ $date->format('m/d') }}（{{ $weekdays[$date->dayOfWeek] ?? '' }}）</th>
+                                @endforeach
+                                <th class="px-4 py-3 text-right">合計</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @foreach ($employmentStartDisplayCategories as $jobCategory)
+                                <tr class="hover:bg-slate-50">
+                                    <th scope="row" class="px-4 py-3 text-left font-semibold text-slate-700">{{ $jobCategory->name }}</th>
+                                    @foreach ($employmentStartDateKeys as $dateKey)
+                                        <td class="px-4 py-3 text-right text-slate-700">
+                                            {{ number_format($employmentStartMatrix[$jobCategory->id][$dateKey] ?? 0) }}
+                                        </td>
+                                    @endforeach
+                                    <td class="px-4 py-3 text-right font-semibold text-slate-900">{{ number_format($employmentStartRowTotals[$jobCategory->id] ?? 0) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                        <tfoot class="bg-slate-100 text-xs font-semibold text-slate-700">
+                            <tr>
+                                <th class="px-4 py-3 text-left">合計</th>
+                                @foreach ($employmentStartDateKeys as $dateKey)
+                                    <th class="px-4 py-3 text-right">{{ number_format($employmentStartColumnTotals[$dateKey] ?? 0) }}</th>
+                                @endforeach
+                                <th class="px-4 py-3 text-right">{{ number_format($employmentStartGrandTotal) }}</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            @endif
+            <p class="mt-4 text-xs text-slate-400">※ 就業開始日は本日以降の予定のみ集計しています。</p>
+        </article>
     </section>
 @endsection
