@@ -85,9 +85,23 @@
         <form class="grid gap-4 lg:grid-cols-12" action="{{ route('candidates.index') }}" method="get">
             <div class="lg:col-span-3">
                 <label class="block text-sm font-semibold text-slate-700" for="keyword">自由語検索</label>
-                <input id="keyword" name="keyword" type="text" value="{{ $filters['keyword'] }}"
-                    placeholder="氏名・条件・メモなど"
-                    class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                <div class="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <input id="keyword" name="keyword" type="text" value="{{ $filters['keyword'] }}"
+                        placeholder="氏名・条件・メモなど"
+                        class="w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                    <div class="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                        <span>結合:</span>
+                        <label class="inline-flex items-center gap-1">
+                            <input type="radio" name="keyword_logic" value="and" class="text-blue-600 focus:ring-blue-500" @checked(($filters['keyword_logic'] ?? 'and') === 'and')>
+                            <span>AND</span>
+                        </label>
+                        <label class="inline-flex items-center gap-1">
+                            <input type="radio" name="keyword_logic" value="or" class="text-blue-600 focus:ring-blue-500" @checked(($filters['keyword_logic'] ?? 'and') === 'or')>
+                            <span>OR</span>
+                        </label>
+                    </div>
+                </div>
+                <p class="mt-1 text-xs text-slate-500">スペースで複数キーワードを指定できます。AND: 全て含む、OR: いずれかを含む候補者を表示します。</p>
             </div>
 
             <div class="lg:col-span-2">

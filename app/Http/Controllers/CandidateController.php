@@ -62,6 +62,7 @@ class CandidateController extends Controller
             'employedStatusCodes' => $employedStatusCodes,
             'filters' => [
                 'keyword' => $request->input('keyword'),
+                'keyword_logic' => (string) $request->query('keyword_logic', 'and'),
                 'agency' => $selectedAgencies,
                 'wish_job' => $selectedWishJobs,
                 'decided_job' => $selectedDecidedJobs,
@@ -195,11 +196,28 @@ class CandidateController extends Controller
         }
 
         if ($keyword = (string) $request->string('keyword')->trim()) {
-            $query->where(function ($inner) use ($keyword) {
-                $inner->where('name', 'like', "%{$keyword}%")
-                    ->orWhere('name_kana', 'like', "%{$keyword}%")
-                    ->orWhere('other_conditions', 'like', "%{$keyword}%");
-            });
+            $keyword = mb_convert_kana($keyword, 's');
+            $phrases = preg_split('/\s+/', $keyword, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $logic = strtolower((string) $request->query('keyword_logic', 'and'));
+            $useOr = $logic === 'or';
+
+            if (empty($phrases)) {
+                $query->where(function ($inner) use ($keyword) {
+                    $inner->where('name', 'like', "%{$keyword}%")
+                        ->orWhere('name_kana', 'like', "%{$keyword}%")
+                        ->orWhere('other_conditions', 'like', "%{$keyword}%");
+                });
+            } else {
+                $query->where(function ($outer) use ($phrases, $useOr) {
+                    foreach ($phrases as $phrase) {
+                        $outer->{$useOr ? 'orWhere' : 'where'}(function ($inner) use ($phrase) {
+                            $inner->where('name', 'like', "%{$phrase}%")
+                                ->orWhere('name_kana', 'like', "%{$phrase}%")
+                                ->orWhere('other_conditions', 'like', "%{$phrase}%");
+                        });
+                    }
+                });
+            }
         }
 
         $agencyIds = $this->normalizeIdValues($request->input('agency'));

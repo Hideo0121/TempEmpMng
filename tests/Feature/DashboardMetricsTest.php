@@ -139,5 +139,21 @@ class DashboardMetricsTest extends TestCase
         $response->assertSeeText($jobOffice->name);
         $response->assertSeeText($jobSales->name);
         $response->assertSeeText('就業決定');
+            $response->assertSeeText('決定済み候補者');
+
+            $searchResponse = $this->actingAs($user)->get(route('candidates.index', ['keyword' => '候補者', 'keyword_logic' => 'and']));
+            $searchResponse->assertOk();
+            $searchResponse->assertSeeText('今日の候補者');
+            $searchResponse->assertSeeText('明日の候補者');
+
+            $andResponse = $this->actingAs($user)->get(route('candidates.index', ['keyword' => '今日 候補者', 'keyword_logic' => 'and']));
+            $andResponse->assertOk();
+            $andResponse->assertSeeText('今日の候補者');
+            $andResponse->assertDontSeeText('明日の候補者');
+
+            $orResponse = $this->actingAs($user)->get(route('candidates.index', ['keyword' => '今日 明日', 'keyword_logic' => 'or']));
+            $orResponse->assertOk();
+            $orResponse->assertSeeText('今日の候補者');
+            $orResponse->assertSeeText('明日の候補者');
     }
 }
