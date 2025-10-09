@@ -25,6 +25,7 @@ class JobCategoryRequest extends FormRequest
             'is_active' => ['required', 'boolean'],
             'planned_hires' => ['nullable', 'integer', 'min:0', 'max:65535'],
             'recruitment_comment' => ['nullable', 'string', 'max:1000'],
+            'is_public' => ['required', 'boolean'],
         ];
     }
 
@@ -40,6 +41,7 @@ class JobCategoryRequest extends FormRequest
             'is_active' => $this->boolean('is_active'),
             'planned_hires' => is_numeric($plannedHires) ? max(0, (int) $plannedHires) : null,
             'recruitment_comment' => ($comment === null || $comment === '') ? null : $comment,
+            'is_public' => $this->boolean('is_public'),
         ]);
     }
 }

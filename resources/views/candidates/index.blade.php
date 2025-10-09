@@ -205,6 +205,14 @@
             </div>
 
             <div class="lg:col-span-2">
+                <label class="block text-sm font-semibold text-slate-700">就業開始予定</label>
+                <div class="mt-1 grid grid-cols-2 gap-2">
+                    <input type="date" name="employment_start_from" value="{{ $filters['employment_start_from'] }}" class="rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                    <input type="date" name="employment_start_to" value="{{ $filters['employment_start_to'] }}" class="rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                </div>
+            </div>
+
+            <div class="lg:col-span-2">
                 <label class="block text-sm font-semibold text-slate-700">対応者</label>
                 <select name="handler" class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
                     <option value="">すべて</option>
@@ -212,6 +220,18 @@
                         <option value="{{ $handler->id }}" @selected((string) $filters['handler'] === (string) $handler->id)>{{ $handler->name }}</option>
                     @endforeach
                 </select>
+            </div>
+
+            <div class="lg:col-span-2">
+                <label class="block text-sm font-semibold text-slate-700">アサインコード</label>
+                <input type="text" name="assignment_code" value="{{ $filters['assignment_code'] }}" placeholder="部分一致で検索"
+                    class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
+            </div>
+
+            <div class="lg:col-span-2">
+                <label class="block text-sm font-semibold text-slate-700">配属ロッカー</label>
+                <input type="text" name="assignment_locker" value="{{ $filters['assignment_locker'] }}" placeholder="例）3F-12"
+                    class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
             </div>
 
             <div class="lg:col-span-2 lg:pr-4 xl:pr-6">
@@ -327,7 +347,7 @@
                         </th>
                         <th class="p-4 text-left" aria-sort="{{ $ariaSort('introduced_on') }}">
                             <a href="{{ $sortUrl('introduced_on') }}" class="group inline-flex items-center gap-1 font-semibold text-slate-600 transition hover:text-blue-600">
-                                <span>紹介日</span>
+                                <span>紹介日 / 見学確定</span>
                                 <span aria-hidden="true" class="text-[0.7rem] text-slate-300 group-hover:text-slate-400">
                                     @if ($currentSort === 'introduced_on')
                                         {{ $currentDirection === 'asc' ? '▲' : '▼' }}
@@ -337,18 +357,7 @@
                                 </span>
                             </a>
                         </th>
-                        <th class="p-4 text-left" aria-sort="{{ $ariaSort('interview_at') }}">
-                            <a href="{{ $sortUrl('interview_at') }}" class="group inline-flex items-center gap-1 font-semibold text-slate-600 transition hover:text-blue-600">
-                                <span>見学確定日時</span>
-                                <span aria-hidden="true" class="text-[0.7rem] text-slate-300 group-hover:text-slate-400">
-                                    @if ($currentSort === 'interview_at')
-                                        {{ $currentDirection === 'asc' ? '▲' : '▼' }}
-                                    @else
-                                        ↕
-                                    @endif
-                                </span>
-                            </a>
-                        </th>
+                        <th class="p-4 text-left" aria-sort="none">アサイン情報</th>
                         <th class="p-4 text-left whitespace-nowrap" aria-sort="{{ $ariaSort('status') }}">
                             <a href="{{ $sortUrl('status') }}" class="group inline-flex items-center gap-1 font-semibold text-slate-600 transition hover:text-blue-600">
                                 <span>ステータス</span>
@@ -392,6 +401,13 @@
                             $statusGradientEnd = $statusColor . '99';
                             $statusBorderColor = $statusColor . '80';
                             $statusLabel = $status->label ?? 'ステータス未設定';
+                            $employmentStartAt = $candidate->employment_start_at;
+                            $interviewAt = optional($latestInterview)->scheduled_at;
+                            $assignmentCodes = collect([
+                                $candidate->assignment_worker_code_a,
+                                $candidate->assignment_worker_code_b,
+                            ])->filter();
+                            $assignmentCodeLabel = $assignmentCodes->isNotEmpty() ? $assignmentCodes->implode('/') : null;
                         @endphp
                         <tr class="transition hover:bg-slate-50" data-candidate-row="{{ $candidate->id }}" data-candidate-name="{{ $candidate->name }}">
                             <td class="p-4">
@@ -424,8 +440,22 @@
                                     <span class="text-slate-400">—</span>
                                 @endif
                             </td>
-                            <td class="p-4 text-slate-700">{{ optional($candidate->introduced_on)->format('Y/m/d') }}</td>
-                            <td class="p-4 text-slate-700">{{ optional(optional($latestInterview)->scheduled_at)->format('Y/m/d H:i') ?? '未調整' }}</td>
+                            <td class="p-4 text-slate-700">
+                                <div class="flex flex-col leading-tight">
+                                    <span class="text-xs font-semibold text-slate-500">紹介日</span>
+                                    <span class="text-sm font-semibold text-slate-900">{{ optional($candidate->introduced_on)->format('Y/m/d') ?? '未設定' }}</span>
+                                    <span class="mt-3 text-xs font-semibold text-slate-500">見学確定日時</span>
+                                    <span class="text-sm text-slate-700">@if ($interviewAt){{ optional($interviewAt)->format('Y/m/d H:i') }}@else未調整@endif</span>
+                                </div>
+                            </td>
+                            <td class="p-4 text-slate-700">
+                                @if ($assignmentCodeLabel)
+                                    <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{{ $assignmentCodeLabel }}</span>
+                                @else
+                                    <span class="text-xs text-slate-400">コード未登録</span>
+                                @endif
+                                <div class="mt-2 text-[11px] text-slate-500">ロッカー: {{ $candidate->assignment_locker ?? '—' }}</div>
+                            </td>
                             <td class="p-4 whitespace-nowrap">
                                 <span
                                     class="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-inset"
@@ -435,6 +465,9 @@
                                     <span class="inline-block h-2 w-2 rounded-full bg-slate-600/60 shadow" aria-hidden="true"></span>
                                     <span data-role="status-text">{{ $statusLabel }}</span>
                                 </span>
+                                @if (\App\Models\CandidateStatus::isEmployed((string) $candidate->status_code))
+                                    <div class="mt-2 text-[11px] text-slate-600">就業開始: {{ optional($employmentStartAt)->format('Y/m/d H:i') ?? '未定' }}</div>
+                                @endif
                             </td>
                             <td class="p-4 text-slate-700" data-role="status-changed-on">{{ optional($candidate->status_changed_on)->format('Y/m/d') ?? '—' }}</td>
                             <td class="p-4">
@@ -568,6 +601,7 @@
 
             wireDateRangeAutoFill('input[name="introduced_from"]', 'input[name="introduced_to"]');
             wireDateRangeAutoFill('input[name="interview_from"]', 'input[name="interview_to"]');
+            wireDateRangeAutoFill('input[name="employment_start_from"]', 'input[name="employment_start_to"]');
 
             const initMultiSelect = (root) => {
                 const toggle = root.querySelector('[data-multiselect-toggle]');

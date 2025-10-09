@@ -46,6 +46,17 @@
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
                 </div>
+                    <div>
+                        <input type="hidden" name="is_public" value="0">
+                        <label class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                            <input type="checkbox" name="is_public" value="1" @checked(old('is_public', $category->is_public)) class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                            公開ページに表示する
+                        </label>
+                        <p class="mt-1 text-xs text-slate-500">チェックを外すと公開ページには表示されません。</p>
+                        @error('is_public')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
             </div>
 
             <div class="grid gap-6 md:grid-cols-2">

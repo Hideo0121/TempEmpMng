@@ -29,6 +29,11 @@
                 $remind30mStatus = $confirmedInterview
                     ? ($confirmedInterview->remind_30m_enabled ? 'ON' : 'OFF')
                     : '未登録';
+                $employmentStartAt = $candidate->employment_start_at;
+                $assignmentCodes = collect([
+                    ['label' => 'コード A', 'value' => $candidate->assignment_worker_code_a],
+                    ['label' => 'コード B', 'value' => $candidate->assignment_worker_code_b],
+                ])->filter(fn ($item) => filled($item['value']));
             @endphp
 
             <header class="flex flex-col gap-4 border-b border-slate-200 pb-4 md:flex-row md:items-center md:justify-between">
@@ -131,6 +136,26 @@
                                     </div>
                                 @endforeach
                             @endif
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-semibold text-slate-600">就業開始予定</h3>
+                        <div class="mt-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                            <p class="font-semibold text-slate-800">{{ optional($employmentStartAt)->format('Y/m/d H:i') ?? '未設定' }}</p>
+                            <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                                @forelse ($assignmentCodes as $code)
+                                    <div class="flex flex-col rounded-xl bg-slate-50 px-3 py-2 text-xs">
+                                        <span class="font-semibold text-slate-500">{{ $code['label'] }}</span>
+                                        <span class="mt-1 text-slate-800">{{ $code['value'] }}</span>
+                                    </div>
+                                @empty
+                                    <p class="text-xs text-slate-500 sm:col-span-2">アサインコードは登録されていません。</p>
+                                @endforelse
+                            </div>
+                            <dl class="mt-3 text-xs text-slate-600">
+                                <dt class="font-semibold">配属ロッカー</dt>
+                                <dd class="mt-1 text-slate-800">{{ $candidate->assignment_locker ?? '未設定' }}</dd>
+                            </dl>
                         </div>
                     </div>
                     <div class="grid gap-3 sm:grid-cols-2">

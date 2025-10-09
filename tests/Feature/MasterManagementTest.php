@@ -39,6 +39,7 @@ class MasterManagementTest extends TestCase
             'name' => '経理アシスタント',
             'sort_order' => 10,
             'is_active' => 1,
+            'is_public' => 1,
         ]);
 
         $response->assertRedirect(route('masters.job-categories.index'));
@@ -46,6 +47,7 @@ class MasterManagementTest extends TestCase
             'name' => '経理アシスタント',
             'sort_order' => 10,
             'is_active' => 1,
+            'is_public' => 1,
         ]);
     }
 
@@ -90,6 +92,7 @@ class MasterManagementTest extends TestCase
             'name' => '一般事務',
             'sort_order' => 1,
             'is_active' => true,
+            'is_public' => true,
         ]);
 
         $category->recruitmentInfo()->create([
@@ -113,6 +116,7 @@ class MasterManagementTest extends TestCase
             'name' => '受付スタッフ',
             'sort_order' => 2,
             'is_active' => true,
+            'is_public' => true,
         ]);
 
         $response = $this->actingAs($manager)->put(route('masters.recruitment-info.update', ['jobCategory' => $category]), [

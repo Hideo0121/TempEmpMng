@@ -41,6 +41,11 @@
         2 => old('visit_candidate2_time', optional(optional($candidate)->visit_candidate2_at)->format('H:i')),
         3 => old('visit_candidate3_time', optional(optional($candidate)->visit_candidate3_at)->format('H:i')),
     ];
+    $employmentStartDate = old('employment_start_date', optional(optional($candidate)->employment_start_at)->format('Y-m-d'));
+    $employmentStartTime = old('employment_start_time', optional(optional($candidate)->employment_start_at)->format('H:i'));
+    $assignmentWorkerCodeA = old('assignment_worker_code_a', optional($candidate)->assignment_worker_code_a);
+    $assignmentWorkerCodeB = old('assignment_worker_code_b', optional($candidate)->assignment_worker_code_b);
+    $assignmentLocker = old('assignment_locker', optional($candidate)->assignment_locker);
     $skillSheets = collect($skillSheets ?? ($candidate ? $candidate->skillSheets : []));
     $existingSkillSheetCount = $skillSheets->count();
     $confirmedInterview = $confirmedInterview ?? null;
@@ -316,6 +321,59 @@
                 @error('status_changed_on')
                     <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                 @enderror
+            </div>
+        </div>
+
+        <div class="mt-6 grid gap-6 md:grid-cols-2">
+            <div>
+                <label class="block text-sm font-semibold text-slate-700" for="employment_start_date">就業開始予定</label>
+                <div class="mt-1 flex gap-2">
+                    <input id="employment_start_date" name="employment_start_date" type="date" value="{{ $employmentStartDate }}"
+                        class="w-1/2 rounded-xl border border-slate-300 px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                    <input id="employment_start_time" name="employment_start_time" type="time" value="{{ $employmentStartTime }}"
+                        class="w-1/2 rounded-xl border border-slate-300 px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                </div>
+                <p class="mt-1 text-xs text-slate-500">開始時間を入力する場合は日付も指定してください。</p>
+                @error('employment_start_date')
+                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                @enderror
+                @error('employment_start_time')
+                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                @enderror
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-slate-700" for="assignment_locker">配属ロッカー</label>
+                <input id="assignment_locker" name="assignment_locker" type="text" value="{{ $assignmentLocker }}"
+                    placeholder="例）3F-12"
+                    class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                @error('assignment_locker')
+                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                @enderror
+            </div>
+        </div>
+
+        <div class="mt-6">
+            <label class="block text-sm font-semibold text-slate-700">アサイン管理コード</label>
+            <p class="mt-1 text-xs text-slate-500">派遣元が発行する作業者コードなどを入力します。</p>
+            <div class="mt-3 grid gap-4 md:grid-cols-2">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500" for="assignment_worker_code_a">コード A</label>
+                    <input id="assignment_worker_code_a" name="assignment_worker_code_a" type="text" value="{{ $assignmentWorkerCodeA }}"
+                        placeholder="例）WK-001"
+                        class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                    @error('assignment_worker_code_a')
+                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500" for="assignment_worker_code_b">コード B</label>
+                    <input id="assignment_worker_code_b" name="assignment_worker_code_b" type="text" value="{{ $assignmentWorkerCodeB }}"
+                        placeholder="例）STF-2024"
+                        class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                    @error('assignment_worker_code_b')
+                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
             </div>
         </div>
 

@@ -70,6 +70,10 @@ class CandidateController extends Controller
                 'introduced_to' => $request->input('introduced_to'),
                 'interview_from' => $request->input('interview_from'),
                 'interview_to' => $request->input('interview_to'),
+                'employment_start_from' => $request->input('employment_start_from'),
+                'employment_start_to' => $request->input('employment_start_to'),
+                'assignment_code' => $request->input('assignment_code'),
+                'assignment_locker' => $request->input('assignment_locker'),
                 'handler' => $request->input('handler'),
                 'remind_30m' => $remindState,
                 'view_state' => $viewState,
@@ -108,6 +112,7 @@ class CandidateController extends Controller
                 '第3希望職種',
                 '就業する職種',
                 '紹介日',
+                '就業開始日時',
                 '見学確定日時',
                 'ステータス',
                 '状態変化日',
@@ -115,6 +120,9 @@ class CandidateController extends Controller
                 '対応者2',
                 '閲覧状態',
                 '30分前リマインド',
+                'アサインコードA',
+                'アサインコードB',
+                '配属ロッカー',
             ];
 
             fputcsv($handle, array_map($encode, $headers));
@@ -134,6 +142,7 @@ class CandidateController extends Controller
                         optional($candidate->wishJob3)->name ?? '',
                         optional($candidate->decidedJob)->name ?? '',
                         optional($candidate->introduced_on)->format('Y/m/d') ?? '',
+                        optional($candidate->employment_start_at)->format('Y/m/d H:i') ?? '',
                         optional(optional($confirmedInterview)->scheduled_at)->format('Y/m/d H:i') ?? '',
                         optional($candidate->status)->label ?? '',
                         optional($candidate->status_changed_on)->format('Y/m/d') ?? '',
@@ -145,6 +154,9 @@ class CandidateController extends Controller
                             false => 'OFF',
                             default => '未設定',
                         },
+                        $candidate->assignment_worker_code_a ?? '',
+                        $candidate->assignment_worker_code_b ?? '',
+                        $candidate->assignment_locker ?? '',
                     ];
 
                     fputcsv($handle, array_map($encode, array_map(static fn ($value) => $value ?? '', $row)));
@@ -235,6 +247,25 @@ class CandidateController extends Controller
 
         if ($interviewTo = $request->date('interview_to')) {
             $query->whereHas('confirmedInterview', fn ($inner) => $inner->whereDate('scheduled_at', '<=', $interviewTo));
+        }
+
+        if ($employmentStartFrom = $request->date('employment_start_from')) {
+            $query->whereDate('employment_start_at', '>=', $employmentStartFrom);
+        }
+
+        if ($employmentStartTo = $request->date('employment_start_to')) {
+            $query->whereDate('employment_start_at', '<=', $employmentStartTo);
+        }
+
+        if ($assignmentCode = (string) $request->string('assignment_code')->trim()) {
+            $query->where(function ($inner) use ($assignmentCode) {
+                $inner->where('assignment_worker_code_a', 'like', "%{$assignmentCode}%")
+                    ->orWhere('assignment_worker_code_b', 'like', "%{$assignmentCode}%");
+            });
+        }
+
+        if ($assignmentLocker = (string) $request->string('assignment_locker')->trim()) {
+            $query->where('assignment_locker', 'like', "%{$assignmentLocker}%");
         }
 
         $remindState = (string) $request->string('remind_30m', 'all');
@@ -668,6 +699,10 @@ class CandidateController extends Controller
             'introduction_note' => $data['introduction_note'] ?? null,
             'status_code' => $data['status'],
             'status_changed_on' => $data['status_changed_on'] ?? null,
+            'employment_start_at' => $this->combineDateTime($data['employment_start_date'] ?? null, $data['employment_start_time'] ?? null),
+            'assignment_worker_code_a' => $data['assignment_worker_code_a'] ?? null,
+            'assignment_worker_code_b' => $data['assignment_worker_code_b'] ?? null,
+            'assignment_locker' => $data['assignment_locker'] ?? null,
         ];
 
         if (!$candidate || !$candidate->exists) {

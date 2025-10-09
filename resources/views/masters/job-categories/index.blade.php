@@ -26,7 +26,7 @@
 
         <div class="mt-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 md:flex-row md:items-center md:justify-between">
             <div class="text-sm text-slate-600">
-                CSVで一括登録・更新ができます。ヘッダ行は <code>name,sort_order,is_active</code>（任意で先頭に <code>id</code> を追加可）で指定してください。
+                CSVで一括登録・更新ができます。ヘッダ行は <code>name,sort_order,is_active,is_public</code>（任意で先頭に <code>id</code> を追加可）で指定してください。
             </div>
             <div class="flex flex-col gap-3 md:flex-row md:items-center">
                 <a
@@ -68,6 +68,7 @@
                         <th class="px-4 py-2 text-left whitespace-nowrap">名称</th>
                         <th class="px-4 py-2 text-left whitespace-nowrap">表示順</th>
                         <th class="px-4 py-2 text-left whitespace-nowrap">状態</th>
+                        <th class="px-4 py-2 text-center whitespace-nowrap">公開</th>
                         <th class="px-4 py-2 text-left whitespace-nowrap">募集人数</th>
                         <th class="px-4 py-2 text-left">募集コメント</th>
                         <th class="px-4 py-2 text-left whitespace-nowrap">最終更新</th>
@@ -86,6 +87,17 @@
                                     <span class="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">利用中</span>
                                 @else
                                     <span class="inline-flex items-center rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-600">停止中</span>
+                                @endif
+                            </td>
+                            <td class="px-4 py-2 align-middle whitespace-nowrap text-center text-slate-700">
+                                @if ($category->is_public)
+                                    <span class="inline-flex items-center justify-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                        <span class="inline-block h-2 w-2 rounded-full bg-emerald-500"></span>表示
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center justify-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+                                        <span class="inline-block h-2 w-2 rounded-full bg-slate-400"></span>非表示
+                                    </span>
                                 @endif
                             </td>
                             <td class="px-4 py-2 align-middle whitespace-nowrap text-slate-700">
@@ -107,7 +119,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-4 py-6 text-center text-slate-500">登録済みの希望職種がありません。</td>
+                            <td colspan="8" class="px-4 py-6 text-center text-slate-500">登録済みの希望職種がありません。</td>
                         </tr>
                     @endforelse
                 </tbody>

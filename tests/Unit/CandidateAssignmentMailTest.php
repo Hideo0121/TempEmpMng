@@ -38,18 +38,21 @@ class CandidateAssignmentMailTest extends TestCase
             'name' => '第一希望職種',
             'sort_order' => 1,
             'is_active' => true,
+            'is_public' => true,
         ]);
 
         $job2 = JobCategory::create([
             'name' => '第二希望職種',
             'sort_order' => 2,
             'is_active' => true,
+            'is_public' => true,
         ]);
 
         $job3 = JobCategory::create([
             'name' => '第三希望職種',
             'sort_order' => 3,
             'is_active' => true,
+            'is_public' => true,
         ]);
 
         $candidate = Candidate::create([

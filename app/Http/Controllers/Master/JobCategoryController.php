@@ -34,6 +34,7 @@ class JobCategoryController extends Controller
             'category' => new JobCategory([
                 'sort_order' => 0,
                 'is_active' => true,
+                'is_public' => true,
             ]),
         ]);
     }
@@ -42,7 +43,7 @@ class JobCategoryController extends Controller
     {
         $validated = $request->validated();
 
-        $category = JobCategory::create(Arr::only($validated, ['name', 'sort_order', 'is_active']));
+        $category = JobCategory::create(Arr::only($validated, ['name', 'sort_order', 'is_active', 'is_public']));
 
         $this->syncRecruitmentInfo($category, $validated);
 
@@ -62,7 +63,7 @@ class JobCategoryController extends Controller
     {
         $validated = $request->validated();
 
-        $jobCategory->update(Arr::only($validated, ['name', 'sort_order', 'is_active']));
+        $jobCategory->update(Arr::only($validated, ['name', 'sort_order', 'is_active', 'is_public']));
 
         $this->syncRecruitmentInfo($jobCategory, $validated);
 
@@ -78,7 +79,7 @@ class JobCategoryController extends Controller
         $callback = function () {
             $handle = fopen('php://output', 'wb');
 
-            fputcsv($handle, ['id', 'name', 'sort_order', 'is_active']);
+            fputcsv($handle, ['id', 'name', 'sort_order', 'is_active', 'is_public']);
 
             JobCategory::query()
                 ->orderBy('sort_order')
@@ -90,6 +91,7 @@ class JobCategoryController extends Controller
                             $category->name,
                             $category->sort_order,
                             $category->is_active ? 1 : 0,
+                            $category->is_public ? 1 : 0,
                         ]);
                     }
                 });
@@ -111,8 +113,10 @@ class JobCategoryController extends Controller
             return back()->withErrors(['file' => 'CSVファイルを開けませんでした。']);
         }
 
-        $expectedWithId = ['id', 'name', 'sort_order', 'is_active'];
-        $expectedWithoutId = ['name', 'sort_order', 'is_active'];
+        $expectedWithId = ['id', 'name', 'sort_order', 'is_active', 'is_public'];
+        $expectedWithoutId = ['name', 'sort_order', 'is_active', 'is_public'];
+        $legacyWithId = ['id', 'name', 'sort_order', 'is_active'];
+        $legacyWithoutId = ['name', 'sort_order', 'is_active'];
         $header = fgetcsv($handle);
 
         if ($header === false) {
@@ -129,14 +133,22 @@ class JobCategoryController extends Controller
 
         $columns = $header;
         $hasIdColumn = false;
+        $hasIsPublicColumn = false;
 
         if ($header === $expectedWithId) {
             $hasIdColumn = true;
-        } elseif ($header !== $expectedWithoutId) {
+            $hasIsPublicColumn = true;
+        } elseif ($header === $expectedWithoutId) {
+            $hasIsPublicColumn = true;
+        } elseif ($header === $legacyWithId) {
+            $hasIdColumn = true;
+        } elseif ($header === $legacyWithoutId) {
+            // legacy without id
+        } else {
             fclose($handle);
 
             return back()->withErrors([
-                'file' => 'CSVヘッダが一致しません。期待する順序: "id,name,sort_order,is_active" または "name,sort_order,is_active"',
+                'file' => 'CSVヘッダが一致しません。期待する順序: "id,name,sort_order,is_active,is_public" / "name,sort_order,is_active,is_public" / "id,name,sort_order,is_active" / "name,sort_order,is_active"',
             ]);
         }
 
@@ -167,6 +179,9 @@ class JobCategoryController extends Controller
                 'name' => $data['name'],
                 'sort_order' => is_numeric($data['sort_order']) ? (int) $data['sort_order'] : 0,
                 'is_active' => $this->normalizeBoolean($data['is_active'], true),
+                'is_public' => $hasIsPublicColumn
+                    ? $this->normalizeBoolean($data['is_public'], true)
+                    : true,
             ];
         }
 
@@ -187,6 +202,7 @@ class JobCategoryController extends Controller
                         'name' => $record['name'],
                         'sort_order' => $record['sort_order'],
                         'is_active' => $record['is_active'],
+                        'is_public' => $record['is_public'],
                     ]);
 
                     continue;
@@ -197,6 +213,7 @@ class JobCategoryController extends Controller
                     [
                         'sort_order' => $record['sort_order'],
                         'is_active' => $record['is_active'],
+                        'is_public' => $record['is_public'],
                     ]
                 );
             }

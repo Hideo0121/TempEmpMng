@@ -12,6 +12,7 @@ class JobCategory extends Model
     protected $casts = [
         'sort_order' => 'integer',
         'is_active' => 'boolean',
+        'is_public' => 'boolean',
     ];
 
     public function recruitmentInfo(): HasOne

@@ -34,6 +34,7 @@ class CandidateReminderUpdateTest extends TestCase
             'name' => '事務職',
             'sort_order' => 1,
             'is_active' => true,
+            'is_public' => true,
         ]);
 
         return compact('agency', 'status', 'job');

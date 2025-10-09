@@ -42,12 +42,14 @@ class CandidateFiltersTest extends TestCase
             'name' => '事務',
             'sort_order' => 1,
             'is_active' => true,
+            'is_public' => true,
         ]);
 
         $jobB = JobCategory::create([
             'name' => '販売',
             'sort_order' => 2,
             'is_active' => true,
+            'is_public' => true,
         ]);
 
         CandidateStatus::refreshEmployedCache();

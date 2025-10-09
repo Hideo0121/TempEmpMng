@@ -22,6 +22,7 @@ class Candidate extends Model
         'visit_candidate2_at' => 'datetime',
         'visit_candidate3_at' => 'datetime',
         'start_on' => 'date',
+        'employment_start_at' => 'datetime',
     ];
 
     public function agency(): BelongsTo

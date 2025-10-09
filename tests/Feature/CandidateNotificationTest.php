@@ -51,6 +51,7 @@ class CandidateNotificationTest extends TestCase
             'name' => '一般事務',
             'sort_order' => 1,
             'is_active' => true,
+            'is_public' => true,
         ]);
 
         CandidateStatus::refreshEmployedCache();

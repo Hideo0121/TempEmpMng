@@ -61,12 +61,14 @@ class DashboardMetricsTest extends TestCase
             'name' => '事務',
             'sort_order' => 1,
             'is_active' => true,
+            'is_public' => true,
         ]);
 
         $jobSales = JobCategory::create([
             'name' => '販売',
             'sort_order' => 2,
             'is_active' => true,
+            'is_public' => true,
         ]);
 
         $candidateToday = Candidate::create([

@@ -55,6 +55,11 @@ class CandidateRequest extends FormRequest
             'visit_candidate3_time' => ['nullable', 'date_format:H:i'],
             'visit_confirmed_date' => ['nullable', 'date'],
             'visit_confirmed_time' => ['nullable', 'date_format:H:i'],
+            'employment_start_date' => ['nullable', 'date'],
+            'employment_start_time' => ['nullable', 'date_format:H:i'],
+            'assignment_worker_code_a' => ['nullable', 'string', 'max:50'],
+            'assignment_worker_code_b' => ['nullable', 'string', 'max:50'],
+            'assignment_locker' => ['nullable', 'string', 'max:50'],
             'remind_30m_enabled' => ['nullable', 'boolean'],
             'handler1' => [
                 'required',
@@ -92,6 +97,15 @@ class CandidateRequest extends FormRequest
                 : null,
             'remind_30m_enabled' => $this->boolean('remind_30m_enabled'),
             'decided_job' => $this->filled('decided_job') ? (int) $this->input('decided_job') : null,
+            'assignment_worker_code_a' => $this->filled('assignment_worker_code_a')
+                ? trim((string) $this->input('assignment_worker_code_a'))
+                : null,
+            'assignment_worker_code_b' => $this->filled('assignment_worker_code_b')
+                ? trim((string) $this->input('assignment_worker_code_b'))
+                : null,
+            'assignment_locker' => $this->filled('assignment_locker')
+                ? trim((string) $this->input('assignment_locker'))
+                : null,
         ]);
     }
 
@@ -137,6 +151,10 @@ class CandidateRequest extends FormRequest
 
             if ($this->filled('visit_confirmed_time') && !$this->filled('visit_confirmed_date')) {
                 $validator->errors()->add('visit_confirmed_date', '確定時間を入力する場合は日付も指定してください。');
+            }
+
+            if ($this->filled('employment_start_time') && !$this->filled('employment_start_date')) {
+                $validator->errors()->add('employment_start_date', '就業開始時間を入力する場合は日付も指定してください。');
             }
 
             $status = $this->input('status');
