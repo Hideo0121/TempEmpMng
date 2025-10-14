@@ -33,9 +33,15 @@ LW_CALENDAR_PREFER_TYPE=
 LW_CALENDAR_USER_ID=
 LW_RETRY_ATTEMPTS=3
 LW_RETRY_DELAY_MS=250
+LW_CA_BUNDLE_PATH=
+LW_VERIFY_SSL=true
 ```
 
 > PEMをファイルで持ちたい場合、`storage/app/lineworks/private_key.pem`に保存し、`.env`に`LW_PRIVATE_KEY_PATH=storage/app/lineworks/private_key.pem`を追加。
+
+> Windows Server などで社内プロキシや自己署名証明書を経由する場合は、信頼済みルート証明書を `LW_CA_BUNDLE_PATH` に指定してください（例: `storage/app/lineworks/ca_bundle.pem`）。既定では Laravel 側で `php.ini` の `curl.cainfo` を参照します。
+
+> テストや障害対応で一時的に証明書検証を無効化したい場合は `LW_VERIFY_SSL=false` を指定できます（本番環境での恒常運用は非推奨）。
 
 > `LW_PRIVATE_KEY_PATH` は絶対パス（例: `C:\Secrets\lineworks.pem`）でも指定できます。
 
@@ -211,4 +217,44 @@ curl -X POST http://localhost:8000/lineworks/events/sample \
 - Token は 50分間キャッシュ
 - ISO8601 + JST指定 (Asia/Tokyo)
 - `createEventOnCalendar()` で特定カレンダーIDへ登録も可
+
+---
+
+## 8) 障害事例と対処履歴
+### 2025-10-14 LINE WORKS 予定登録エラー
+**症状**
+- LINE WORKS API から `SERVICE_UNAVAILABLE` が返り、予定が登録されない。
+- Laravel 側のリクエストログには HTTP 503 とエラーメッセージのみが残る。
+
+
+### 2025-10-14 Windows Server + IIS での SSL チェーンエラー
+**症状**
+- 本番環境 (Windows Server + IIS) で `LINE WORKSアクセストークンの取得に失敗しました。` と出力され、`cURL error 60: SSL certificate problem: self-signed certificate in certificate chain` がログに記録される。
+
+**原因**
+- サーバーが社内プロキシ経由で外部通信を行っており、応答に社内 CA の自己署名証明書が含まれていた。
+- PHP (cURL) が参照している CA バンドルに社内 CA が含まれていないため、証明書検証が失敗していた。
+
+**対応**
+- 社内 CA の証明書を Base64 (PEM) 形式でエクスポートし、アプリケーションサーバーの `storage/app/lineworks/ca_bundle.pem` に配置。
+- `.env` に `LW_CA_BUNDLE_PATH=storage/app/lineworks/ca_bundle.pem` を設定し、`php artisan config:clear` を実行。
+- 必要に応じて `php.ini` の `curl.cainfo` にも同じバンドルを指定して cURL 全体で共有する。
+
+**教訓**
+- Windows + IIS 環境では PHP の cURL が OS 証明書ストアを自動参照しないため、社内 CA を PEM 形式で明示的に渡す設計を用意しておく。
+- 証明書検証を無効化する代わりに、信頼済み証明書をアプリ側で管理する方が安全。
+**原因**
+1. `start / end` の `dateTime` フィールドが `YYYY-MM-DD HH:mm:ss` 形式になっており、API が要求する `YYYY-MM-DDTHH:mm:ss` から外れていた。
+2. 入力文字列のタイムゾーン正規化が不十分で、`Asia/Tokyo` 想定の日時が UTC 解釈されるケースがあった。
+3. イベント生成時にオプション配列を素のまま `array_merge` していたため、`timeZone` など API が解釈しないキーがトップレベルに混入し、payload が不正になっていた。
+
+**対応**
+- PowerShell 検証スクリプトと同じ処理に合わせ、`makeEvent()` 内で `normalizeEventDateTime()` を実装。Carbon / 文字列どちらの入力でも `Asia/Tokyo` に揃えた `YYYY-MM-DDTHH:mm:ss` を生成するよう修正。
+- イベント配列に含めるキーを `summary` / `start` / `end` / `description` / `location` のみに限定し、不要なオプションは除去。
+- 対応後に `phpunit --filter LineworksCalendarServiceTest` を実行し、10件のテストが成功することを確認。
+
+**教訓**
+- PowerShell 版など既存の成功例と API payload を精査し、フォーマット差分を必ず吸収する。
+- 日時を受け渡す処理では、入力源を問わずタイムゾーンと ISO8601 形式を強制するヘルパーを用意しておく。
+- オプション配列をそのまま JSON に流し込むのではなく、API 仕様に沿った構造へ整形する。
 

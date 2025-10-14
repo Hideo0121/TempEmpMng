@@ -3,7 +3,9 @@
 namespace Tests\Unit;
 
 use App\Exceptions\LineworksServiceUnavailableException;
+use App\Models\Candidate;
 use App\Services\LineworksCalendarService;
+use Carbon\Carbon;
 use GuzzleHttp\Client;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
@@ -526,5 +528,55 @@ class LineworksCalendarServiceTest extends TestCase
         $this->expectExceptionMessage('LINE WORKSカレンダーへの登録に失敗しました。(Service failure)');
 
         $service->createEvent('user-123', $event);
+    }
+
+    public function test_create_interview_event_uses_expected_summary_format(): void
+    {
+        config()->set('services.lineworks', [
+            'enabled' => true,
+            'auth_url' => 'https://auth.example.com/oauth/token',
+            'api_base' => 'https://lineworks.test/v1',
+            'client_id' => 'client-123',
+            'client_secret' => 'secret-456',
+            'service_account' => 'service-account@test',
+            'private_key_pem' => 'dummy-key',
+            'scope' => 'calendar',
+            'default_tz' => 'Asia/Tokyo',
+            'calendar_id' => 'c_abcdef',
+            'retry_attempts' => 1,
+            'retry_delay_ms' => 0,
+        ]);
+
+        $collector = new class extends LineworksCalendarService {
+            public array $captured = [];
+
+            public function __construct()
+            {
+                parent::__construct(new Client());
+            }
+
+            public function accessToken(): string
+            {
+                return 'token-abc';
+            }
+
+            public function createEvent(string $userId, array $event, ?string $calendarId = null): array
+            {
+                $this->captured = [
+                    'userId' => $userId,
+                    'event' => $event,
+                    'calendarId' => $calendarId,
+                ];
+
+                return ['ok' => true];
+            }
+        };
+
+        $candidate = new Candidate(['name' => '山田 太郎']);
+        $scheduledAt = Carbon::parse('2025-01-15 10:00:00', 'Asia/Tokyo');
+
+        $collector->createInterviewEvent($candidate, $scheduledAt);
+
+        $this->assertSame('職場見学(山田 太郎)', $collector->captured['event']['summary']);
     }
 }

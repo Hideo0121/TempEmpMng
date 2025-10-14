@@ -55,6 +55,8 @@ return [
         'calendar_user_id' => env('LW_CALENDAR_USER_ID'),
         'retry_attempts' => (int) env('LW_RETRY_ATTEMPTS', 3),
         'retry_delay_ms' => (int) env('LW_RETRY_DELAY_MS', 250),
+        'ca_bundle_path' => env('LW_CA_BUNDLE_PATH'),
+        'verify_ssl' => env('LW_VERIFY_SSL', true),
     ],
 
 ];

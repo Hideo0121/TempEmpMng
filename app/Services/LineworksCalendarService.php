@@ -29,7 +29,7 @@ class LineworksCalendarService
     public function __construct(?Client $client = null)
     {
         $this->config = config('services.lineworks', []);
-        $this->client = $client ?? new Client(['timeout' => 15]);
+        $this->client = $client ?? new Client($this->makeClientOptions());
     }
 
     public function isConfigured(): bool
@@ -64,7 +64,7 @@ class LineworksCalendarService
         $end = $start->copy()->addMinutes($this->eventDurationMinutes());
 
         $event = $this->makeEvent(
-            sprintf('%s の見学', $candidate->name),
+            sprintf('職場見学(%s)', $candidate->name),
             $start,
             $end,
             [
@@ -360,6 +360,100 @@ class LineworksCalendarService
         }
 
         throw new RuntimeException('LINE WORKS private key not configured');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function makeClientOptions(): array
+    {
+        $options = ['timeout' => 15];
+
+        $verify = $this->resolveVerifyOption();
+
+        $this->logVerifyDecision($verify);
+
+        if ($verify !== null) {
+            $options['verify'] = $verify;
+        }
+
+        return $options;
+    }
+
+    private function resolveVerifyOption(): bool|string|null
+    {
+        $verify = $this->configValue('verify_ssl', true);
+
+        if ($this->isExplicitBooleanFalse($verify)) {
+            return false;
+        }
+
+        $caBundle = $this->configValue('ca_bundle_path');
+
+        if (!is_string($caBundle)) {
+            return null;
+        }
+
+        $caBundle = trim($caBundle);
+
+        if ($caBundle === '') {
+            return null;
+        }
+
+        $path = $this->resolveCaBundlePath($caBundle);
+
+        if (!is_readable($path)) {
+            Log::error('LINE WORKS CA bundle file is not readable.', [
+                'configured_path' => $caBundle,
+                'resolved_path' => $path,
+            ]);
+            throw new RuntimeException('LINE WORKS CA bundle file is not readable: ' . $path);
+        }
+
+        return $path;
+    }
+
+    private function resolveCaBundlePath(string $path): string
+    {
+        return $this->resolvePrivateKeyPath($path);
+    }
+
+    private function logVerifyDecision(bool|string|null $verify): void
+    {
+        if ($verify === null) {
+            Log::info('LINE WORKS HTTP client will use default CA store for SSL verification.');
+
+            return;
+        }
+
+        if ($verify === false) {
+            Log::warning('LINE WORKS HTTP client SSL verification is disabled by configuration.');
+
+            return;
+        }
+
+        Log::info('LINE WORKS HTTP client will use custom CA bundle for SSL verification.', [
+            'ca_bundle_path' => $verify,
+        ]);
+    }
+
+    private function isExplicitBooleanFalse(mixed $value): bool
+    {
+        if ($value === false) {
+            return true;
+        }
+
+        if (is_string($value)) {
+            $value = strtolower(trim($value));
+
+            return in_array($value, ['0', 'false', 'off', 'no'], true);
+        }
+
+        if (is_int($value)) {
+            return $value === 0;
+        }
+
+        return false;
     }
 
     private function determineCalendarId(string $token, string $userId, ?string $calendarId): ?string
