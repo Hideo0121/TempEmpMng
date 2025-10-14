@@ -121,6 +121,33 @@
                                 <dt class="font-semibold">30分前リマインドを送信する</dt>
                                 <dd class="mt-1 text-slate-800">{{ $remind30mStatus }}</dd>
                             </dl>
+
+                            @if ($lineworksConfigured)
+                                <div class="mt-4 space-y-3">
+                                    @if (session('lineworks_status'))
+                                        <p class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+                                            {{ session('lineworks_status') }}
+                                        </p>
+                                    @endif
+                                    @if (session('lineworks_error'))
+                                        <p class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-600">
+                                            {{ session('lineworks_error') }}
+                                        </p>
+                                    @endif
+
+                                    @if ($lineworksReady)
+                                        <form method="post" action="{{ route('candidates.lineworks.register', $candidate) }}" class="inline-block">
+                                            @csrf
+                                            <input type="hidden" name="back" value="{{ $backUrl }}">
+                                            <button type="submit" class="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-500">
+                                                Lineworksカレンダーに登録
+                                            </button>
+                                        </form>
+                                    @else
+                                        <p class="text-xs text-slate-500">見学確定日と時間を入力すると、LINE WORKSへ登録できます。</p>
+                                    @endif
+                                </div>
+                            @endif
                         </div>
                     </div>
                     <div>

@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\LineworksServiceUnavailableException;
 use App\Http\Requests\CandidateRequest;
 use App\Http\Requests\ChangeCandidateStatusRequest;
 use App\Http\Requests\UpdateCandidateMemoRequest;
+use App\Jobs\RegisterLineworksInterviewEvent;
 use App\Models\Agency;
 use App\Models\Candidate;
 use App\Models\CandidateStatus;
@@ -13,6 +15,7 @@ use App\Models\Interview;
 use App\Models\JobCategory;
 use App\Models\SkillSheet;
 use App\Models\User;
+use App\Services\LineworksCalendarService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -26,6 +29,7 @@ use Illuminate\View\View;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 use App\Mail\CandidateAssignmentMail;
+use Throwable;
 
 class CandidateController extends Controller
 {
@@ -512,7 +516,17 @@ class CandidateController extends Controller
             $backUrl = route('candidates.index');
         }
 
-        return view('candidates.show', compact('candidate', 'backUrl'));
+        $lineworksService = app(LineworksCalendarService::class);
+        $confirmedAt = optional($candidate->confirmedInterview)->scheduled_at;
+        $lineworksConfigured = $lineworksService->isConfigured();
+        $lineworksReady = $lineworksConfigured && $this->hasConfirmedInterviewDateTime($confirmedAt);
+
+        return view('candidates.show', [
+            'candidate' => $candidate,
+            'backUrl' => $backUrl,
+            'lineworksConfigured' => $lineworksConfigured,
+            'lineworksReady' => $lineworksReady,
+        ]);
     }
 
     public function edit(Request $request, Candidate $candidate): View
@@ -653,6 +667,58 @@ class CandidateController extends Controller
             ->with('status', 'その他条件・メモを更新しました。');
     }
 
+    public function registerLineworks(Request $request, Candidate $candidate, LineworksCalendarService $lineworks): RedirectResponse
+    {
+        $candidate->loadMissing(['agency', 'handler1', 'handler2', 'confirmedInterview']);
+
+        $backUrl = $request->input('back');
+        $routeParams = ['candidate' => $candidate->getKey()];
+
+        if (is_string($backUrl) && Str::startsWith($backUrl, url('/'))) {
+            $routeParams['back'] = $backUrl;
+        } else {
+            $backUrl = null;
+        }
+
+        $confirmedAt = optional($candidate->confirmedInterview)->scheduled_at;
+
+        if (!$this->hasConfirmedInterviewDateTime($confirmedAt)) {
+            return redirect()->route('candidates.show', $routeParams)
+                ->with('lineworks_error', '見学確定日と時間の両方を設定してください。');
+        }
+
+        if (!$lineworks->isConfigured()) {
+            return redirect()->route('candidates.show', $routeParams)
+                ->with('lineworks_error', 'LINE WORKS の設定が完了していません。');
+        }
+
+        try {
+            $lineworks->createInterviewEvent($candidate, $confirmedAt);
+        } catch (LineworksServiceUnavailableException $e) {
+            RegisterLineworksInterviewEvent::dispatch($candidate->getKey())
+                ->delay(now()->addMinutes(1));
+
+            Log::warning('LINE WORKS calendar registration deferred for retry', [
+                'candidate_id' => $candidate->getKey(),
+                'message' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('candidates.show', $routeParams)
+                ->with('lineworks_error', 'LINE WORKSが一時的に利用できないため、登録を自動で再試行します。後ほど結果をご確認ください。');
+        } catch (Throwable $e) {
+            Log::error('LINE WORKS calendar registration failed', [
+                'candidate_id' => $candidate->getKey(),
+                'message' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('candidates.show', $routeParams)
+                ->with('lineworks_error', 'LINE WORKSカレンダーへの登録に失敗しました。');
+        }
+
+        return redirect()->route('candidates.show', $routeParams)
+            ->with('lineworks_status', 'LINE WORKSカレンダーに登録しました。');
+    }
+
     public function changeStatus(ChangeCandidateStatusRequest $request, Candidate $candidate): JsonResponse
     {
         $user = $request->user();
@@ -717,6 +783,15 @@ class CandidateController extends Controller
             'changed' => $statusChanged,
             'celebrate_url' => $shouldCelebrate ? route('candidates.celebrate') : null,
         ]);
+    }
+
+    private function hasConfirmedInterviewDateTime(?Carbon $confirmedAt): bool
+    {
+        if (!$confirmedAt) {
+            return false;
+        }
+
+        return !$confirmedAt->equalTo($confirmedAt->copy()->startOfDay());
     }
 
     private function candidateAttributesFromRequest(CandidateRequest $request, ?User $user, ?Candidate $candidate = null): array
