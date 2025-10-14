@@ -130,6 +130,8 @@
             @php
                 $dateKeys = $dateRange->map->toDateString();
                 $displayHandlers = $handlers->filter(fn ($handler) => ($handlerRowTotals[$handler->id] ?? 0) > 0);
+                $rangeStart = optional($dateRange->first())->toDateString();
+                $rangeEnd = optional($dateRange->last())->toDateString();
             @endphp
             @if ($displayHandlers->isEmpty())
                 <p class="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
@@ -152,9 +154,41 @@
                                 <tr class="hover:bg-slate-50">
                                     <th scope="row" class="px-4 py-3 text-left font-semibold text-slate-700">{{ $handler->name }}</th>
                                     @foreach ($dateKeys as $dateKey)
-                                        <td class="px-4 py-3 text-right text-slate-700">{{ number_format($handlerVisitMatrix[$handler->id][$dateKey] ?? 0) }}</td>
+                                        @php
+                                            $cellCount = (int) ($handlerVisitMatrix[$handler->id][$dateKey] ?? 0);
+                                            $cellUrl = $cellCount > 0
+                                                ? route('candidates.index', [
+                                                    'handler' => $handler->id,
+                                                    'interview_from' => $dateKey,
+                                                    'interview_to' => $dateKey,
+                                                ])
+                                                : null;
+                                        @endphp
+                                        <td class="px-4 py-3 text-right text-slate-700">
+                                            @if ($cellUrl)
+                                                <a href="{{ $cellUrl }}" class="font-semibold text-blue-600 hover:text-blue-500 hover:underline">{{ number_format($cellCount) }}</a>
+                                            @else
+                                                <span class="text-slate-400">{{ number_format($cellCount) }}</span>
+                                            @endif
+                                        </td>
                                     @endforeach
-                                    <td class="px-4 py-3 text-right font-semibold text-slate-900">{{ number_format($handlerRowTotals[$handler->id] ?? 0) }}</td>
+                                    @php
+                                        $rowTotal = (int) ($handlerRowTotals[$handler->id] ?? 0);
+                                        $rowUrl = $rowTotal > 0 && $rangeStart && $rangeEnd
+                                            ? route('candidates.index', [
+                                                'handler' => $handler->id,
+                                                'interview_from' => $rangeStart,
+                                                'interview_to' => $rangeEnd,
+                                            ])
+                                            : null;
+                                    @endphp
+                                    <td class="px-4 py-3 text-right font-semibold text-slate-900">
+                                        @if ($rowUrl)
+                                            <a href="{{ $rowUrl }}" class="text-blue-600 hover:text-blue-500 hover:underline">{{ number_format($rowTotal) }}</a>
+                                        @else
+                                            <span class="text-slate-500">{{ number_format($rowTotal) }}</span>
+                                        @endif
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>
