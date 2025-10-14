@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\CandidateRequest;
 use App\Http\Requests\ChangeCandidateStatusRequest;
+use App\Http\Requests\UpdateCandidateMemoRequest;
 use App\Models\Agency;
 use App\Models\Candidate;
 use App\Models\CandidateStatus;
@@ -625,6 +626,31 @@ class CandidateController extends Controller
             'redirectUrl' => $payload['redirect_url'] ?? route('dashboard'),
             'delaySeconds' => $delaySeconds,
         ]);
+    }
+
+    public function updateMemo(UpdateCandidateMemoRequest $request, Candidate $candidate): RedirectResponse
+    {
+        $data = $request->validated();
+
+        $candidate->other_conditions = $data['other_conditions'] ?? null;
+        $candidate->updated_by = $request->user()?->id;
+        $candidate->save();
+
+        $backUrl = $data['back'] ?? null;
+
+        if (!is_string($backUrl) || !Str::startsWith($backUrl, url('/'))) {
+            $backUrl = null;
+        }
+
+        $routeParams = ['candidate' => $candidate->getKey()];
+
+        if ($backUrl) {
+            $routeParams['back'] = $backUrl;
+        }
+
+        return redirect()
+            ->route('candidates.show', $routeParams)
+            ->with('status', 'その他条件・メモを更新しました。');
     }
 
     public function changeStatus(ChangeCandidateStatusRequest $request, Candidate $candidate): JsonResponse

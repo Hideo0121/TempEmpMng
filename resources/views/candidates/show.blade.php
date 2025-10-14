@@ -170,9 +170,21 @@
                     </div>
                     <div>
                         <h3 class="text-sm font-semibold text-slate-600">その他条件・メモ</h3>
-                        <div class="mt-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                            {!! nl2br(e($candidate->other_conditions ?? '未入力')) !!}
-                        </div>
+                        <form method="post" action="{{ route('candidates.memo.update', $candidate) }}" class="mt-2 space-y-3">
+                            @csrf
+                            @method('PATCH')
+                            <input type="hidden" name="back" value="{{ $backUrl }}">
+                            <textarea name="other_conditions" rows="6" class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200" placeholder="条件やメモを入力してください（2000文字まで）">{{ old('other_conditions', $candidate->other_conditions) }}</textarea>
+                            @error('other_conditions')
+                                <p class="text-sm text-rose-600">{{ $message }}</p>
+                            @enderror
+                            <div class="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+                                <span>※ 「保存する」ボタンで入力内容は保存され、全スタッフが参照できます。</span>
+                                <button type="submit" class="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500">
+                                    保存する
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </section>
             </div>

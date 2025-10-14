@@ -35,6 +35,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/candidates/{candidate}/edit', [CandidateController::class, 'edit'])->name('candidates.edit');
     Route::put('/candidates/{candidate}', [CandidateController::class, 'update'])->name('candidates.update');
     Route::patch('/candidates/{candidate}/status', [CandidateController::class, 'changeStatus'])->name('candidates.status.update');
+    Route::patch('/candidates/{candidate}/memo', [CandidateController::class, 'updateMemo'])->name('candidates.memo.update');
     Route::get('/candidates/{candidate}', [CandidateController::class, 'show'])->name('candidates.show');
     Route::get('/candidates/{candidate}/skill-sheets/{skillSheet}', [CandidateSkillSheetController::class, 'download'])
         ->name('candidates.skill-sheets.download');
