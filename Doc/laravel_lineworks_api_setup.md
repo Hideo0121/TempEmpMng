@@ -227,6 +227,24 @@ curl -X POST http://localhost:8000/lineworks/events/sample \
 - Laravel 側のリクエストログには HTTP 503 とエラーメッセージのみが残る。
 
 
+### 2025-10-15 Start time not set 応答
+**症状**
+- API から `INVALID_PARAMETER` (`Start time not set`) が返され、予定の作成が拒否される。
+- リクエスト payload の `start.dateTime` / `end.dateTime` は `Y-m-d\\TH:i:s` 形式で送信しており、`timeZone` フィールドには IANA 形式 (`Asia/Tokyo` など) を指定している。
+
+**原因/推測**
+- LINE WORKS 側が日付文字列に明示的な UTC オフセットを要求するケースがある。
+- 同一 payload でも成功する環境があることから、バリデーションがタイミングやテナント条件で変動している可能性がある。
+
+**対応**
+- `LineworksCalendarService::createEvent()` で `Start time not set` を検知した際に、該当イベントの `dateTime` へ `+09:00` などの UTC オフセットを付与して自動リトライするフォールバックを導入。
+- 通常フローでは従来通り `Y-m-d\TH:i:s` 形式を維持し、必要時のみ追加のリトライを発動。
+- フォールバック適用時は警告ログを出力し、調査時に切り分けできるようにした。
+
+**教訓**
+- バリデーションエラーのメッセージを解析し、フェイルセーフの再送戦略を用意しておくと復旧が早まる。
+- API 仕様が曖昧な場合でも、UTC オフセット付与など一般的な ISO8601 形式を予備手段として持っておくと安心。
+
 ### 2025-10-14 Windows Server + IIS での SSL チェーンエラー
 **症状**
 - 本番環境 (Windows Server + IIS) で `LINE WORKSアクセストークンの取得に失敗しました。` と出力され、`cURL error 60: SSL certificate problem: self-signed certificate in certificate chain` がログに記録される。

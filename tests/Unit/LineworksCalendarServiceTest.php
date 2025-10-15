@@ -424,6 +424,70 @@ class LineworksCalendarServiceTest extends TestCase
         $this->assertCount(2, $history);
     }
 
+    public function test_create_event_applies_offset_fallback_on_start_time_error(): void
+    {
+        config()->set('services.lineworks', [
+            'enabled' => true,
+            'auth_url' => 'https://auth.example.com/oauth/token',
+            'api_base' => 'https://lineworks.test/v1',
+            'client_id' => 'client-123',
+            'client_secret' => 'secret-456',
+            'service_account' => 'service-account@test',
+            'private_key_pem' => 'dummy-key',
+            'scope' => 'calendar',
+            'default_tz' => 'Asia/Tokyo',
+            'calendar_id' => 'c_abcdef',
+            'retry_attempts' => 3,
+            'retry_delay_ms' => 0,
+        ]);
+
+        $history = [];
+        $mockHandler = new MockHandler([
+            new Response(400, ['Content-Type' => 'application/json'], json_encode([
+                'code' => 'INVALID_PARAMETER',
+                'description' => 'Start time not set',
+            ])),
+            new Response(201, ['Content-Type' => 'application/json'], json_encode(['eventId' => 'fallback'])),
+        ]);
+        $handlerStack = HandlerStack::create($mockHandler);
+        $handlerStack->push(Middleware::history($history));
+
+        $client = new Client(['handler' => $handlerStack]);
+
+        $service = new class($client) extends LineworksCalendarService {
+            public function __construct(Client $client)
+            {
+                parent::__construct($client);
+            }
+
+            public function accessToken(): string
+            {
+                return 'token-abc';
+            }
+        };
+
+        $event = $service->makeEvent(
+            'テストイベント',
+            '2024-01-01T10:00:00',
+            '2024-01-01T11:00:00'
+        );
+
+        $response = $service->createEvent('user-123', $event);
+
+        $this->assertSame(['eventId' => 'fallback'], $response);
+        $this->assertCount(2, $history);
+
+        $request = $history[1]['request'];
+        $payload = json_decode((string) $request->getBody(), true);
+        $start = $payload['eventComponents'][0]['start']['dateTime'] ?? null;
+        $end = $payload['eventComponents'][0]['end']['dateTime'] ?? null;
+
+        $this->assertNotNull($start);
+        $this->assertNotNull($end);
+        $this->assertStringEndsWith('+09:00', $start);
+        $this->assertStringEndsWith('+09:00', $end);
+    }
+
     public function test_create_event_throws_with_error_description(): void
     {
         config()->set('services.lineworks', [

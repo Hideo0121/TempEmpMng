@@ -84,6 +84,9 @@ class LineworksCalendarService
         $effectiveCalendarId = $this->determineCalendarId($token, $userId, $calendarId);
         $url = $this->buildEventEndpoint($userId, $effectiveCalendarId);
 
+        $eventPayload = $event;
+        $offsetFallbackApplied = false;
+
         $payload = [
             'headers' => [
                 'Authorization' => 'Bearer ' . $token,
@@ -91,7 +94,7 @@ class LineworksCalendarService
                 'Accept' => 'application/json',
             ],
             'json' => [
-                'eventComponents' => [$event],
+                'eventComponents' => [$eventPayload],
             ],
         ];
 
@@ -122,6 +125,24 @@ class LineworksCalendarService
                 $errorDetails = $this->extractErrorDetails($exception->getResponse());
                 $lastErrorCode = $errorDetails['code'] ?? $lastErrorCode;
                 $lastErrorDescription = $errorDetails['description'] ?? $lastErrorDescription;
+
+                if (!$offsetFallbackApplied && $this->shouldApplyStartTimeFallback($eventPayload, $errorDetails)) {
+                    $offsetFallbackApplied = true;
+                    $eventPayload = $this->withExplicitOffsetDates($eventPayload);
+                    $payload['json']['eventComponents'] = [$eventPayload];
+                    $attempt--;
+
+                    Log::warning('LINE WORKS start time fallback applied (offset appended).', array_filter(
+                        array_merge($context, [
+                            'attempt' => $attempt + 1,
+                            'description' => $lastErrorDescription,
+                            'code' => $lastErrorCode,
+                        ]),
+                        static fn ($value) => $value !== null && $value !== ''
+                    ));
+
+                    continue;
+                }
 
                 Log::error('LINE WORKSカレンダーへのリクエストで例外が発生しました。', array_filter(
                     array_merge($context, [
@@ -166,6 +187,24 @@ class LineworksCalendarService
                 $lastErrorCode = $errorDetails['code'] ?? $lastErrorCode;
                 $lastErrorDescription = $errorDetails['description'] ?? $lastErrorDescription;
 
+                if (!$offsetFallbackApplied && $this->shouldApplyStartTimeFallback($eventPayload, $errorDetails)) {
+                    $offsetFallbackApplied = true;
+                    $eventPayload = $this->withExplicitOffsetDates($eventPayload);
+                    $payload['json']['eventComponents'] = [$eventPayload];
+                    $attempt--;
+
+                    Log::warning('LINE WORKS start time fallback applied (offset appended).', array_filter(
+                        array_merge($context, [
+                            'attempt' => $attempt + 1,
+                            'description' => $lastErrorDescription,
+                            'code' => $lastErrorCode,
+                        ]),
+                        static fn ($value) => $value !== null && $value !== ''
+                    ));
+
+                    continue;
+                }
+
                 Log::error('LINE WORKSカレンダーへの登録が失敗しました。', array_filter(
                     array_merge($context, [
                         'status' => $status,
@@ -196,6 +235,68 @@ class LineworksCalendarService
         $message = $this->formatLineworksErrorMessage($lastErrorDescription, $lastErrorCode);
 
         throw $this->buildLineworksException($lastErrorCode, $message, $lastException);
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @param array{code?: string, description?: string} $errorDetails
+     */
+    private function shouldApplyStartTimeFallback(array $event, array $errorDetails): bool
+    {
+        $description = $errorDetails['description'] ?? '';
+
+        if (!is_string($description) || $description === '') {
+            return false;
+        }
+
+        if (!str_contains(mb_strtolower($description), 'start time not set')) {
+            return false;
+        }
+
+        return isset($event['start']['dateTime'], $event['start']['timeZone'], $event['end']['dateTime'], $event['end']['timeZone']);
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @return array<string, mixed>
+     */
+    private function withExplicitOffsetDates(array $event): array
+    {
+        if (isset($event['start']['dateTime'], $event['start']['timeZone']) && is_string($event['start']['dateTime']) && is_string($event['start']['timeZone'])) {
+            $event['start']['dateTime'] = $this->appendOffsetIfMissing($event['start']['dateTime'], $event['start']['timeZone']);
+        }
+
+        if (isset($event['end']['dateTime'], $event['end']['timeZone']) && is_string($event['end']['dateTime']) && is_string($event['end']['timeZone'])) {
+            $event['end']['dateTime'] = $this->appendOffsetIfMissing($event['end']['dateTime'], $event['end']['timeZone']);
+        }
+
+        return $event;
+    }
+
+    private function appendOffsetIfMissing(string $dateTime, string $timeZone): string
+    {
+        if ($this->dateTimeHasExplicitOffset($dateTime)) {
+            return $dateTime;
+        }
+
+        try {
+            $carbon = Carbon::parse($dateTime, $timeZone);
+        } catch (Throwable $exception) {
+            Log::warning('Failed to append offset to LINE WORKS dateTime.', [
+                'dateTime' => $dateTime,
+                'timeZone' => $timeZone,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return $dateTime;
+        }
+
+        return $carbon->setTimezone($timeZone)->format('Y-m-d\TH:i:sP');
+    }
+
+    private function dateTimeHasExplicitOffset(string $value): bool
+    {
+        return (bool) preg_match('/([+-]\d{2}:\d{2}|Z)$/', $value);
     }
 
     public function makeEvent(string $summary, string|CarbonInterface $startDateTime, string|CarbonInterface $endDateTime, array $options = []): array
