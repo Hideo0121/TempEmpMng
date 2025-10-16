@@ -370,7 +370,7 @@ class LineworksCalendarServiceTest extends TestCase
         );
     }
 
-    public function test_create_event_retries_on_service_unavailable(): void
+    public function test_create_event_does_not_retry_on_service_unavailable(): void
     {
         config()->set('services.lineworks', [
             'enabled' => true,
@@ -383,8 +383,6 @@ class LineworksCalendarServiceTest extends TestCase
             'scope' => 'calendar',
             'default_tz' => 'Asia/Tokyo',
             'calendar_id' => 'c_abcdef',
-            'retry_attempts' => 3,
-            'retry_delay_ms' => 0,
         ]);
 
         $history = [];
@@ -418,10 +416,14 @@ class LineworksCalendarServiceTest extends TestCase
             '2024-01-01T11:00:00+09:00'
         );
 
-        $response = $service->createEvent('user-123', $event);
+        try {
+            $service->createEvent('user-123', $event);
+            $this->fail('Expected LineworksServiceUnavailableException was not thrown.');
+        } catch (LineworksServiceUnavailableException $exception) {
+            $this->assertSame('LINE WORKSカレンダーへの登録に失敗しました。(Service failure)', $exception->getMessage());
+        }
 
-        $this->assertSame(['eventId' => 'xyz'], $response);
-        $this->assertCount(2, $history);
+        $this->assertCount(1, $history);
     }
 
     public function test_create_event_applies_offset_fallback_on_start_time_error(): void
@@ -471,6 +473,10 @@ class LineworksCalendarServiceTest extends TestCase
             '2024-01-01T10:00:00',
             '2024-01-01T11:00:00'
         );
+
+        // テストでは、他所から渡されたイベントを想定して明示的にオフセットを外す
+        $event['start']['dateTime'] = '2024-01-01T10:00:00';
+        $event['end']['dateTime'] = '2024-01-01T11:00:00';
 
         $response = $service->createEvent('user-123', $event);
 
@@ -535,61 +541,6 @@ class LineworksCalendarServiceTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('LINE WORKSカレンダーへの登録に失敗しました。(Invalid date range)');
-
-        $service->createEvent('user-123', $event);
-    }
-
-    public function test_create_event_throws_service_unavailable_exception_after_retries(): void
-    {
-        config()->set('services.lineworks', [
-            'enabled' => true,
-            'auth_url' => 'https://auth.example.com/oauth/token',
-            'api_base' => 'https://lineworks.test/v1',
-            'client_id' => 'client-123',
-            'client_secret' => 'secret-456',
-            'service_account' => 'service-account@test',
-            'private_key_pem' => 'dummy-key',
-            'scope' => 'calendar',
-            'default_tz' => 'Asia/Tokyo',
-            'calendar_id' => 'c_abcdef',
-            'retry_attempts' => 2,
-            'retry_delay_ms' => 0,
-        ]);
-
-        $mockHandler = new MockHandler([
-            new Response(400, ['Content-Type' => 'application/json'], json_encode([
-                'code' => 'SERVICE_UNAVAILABLE',
-                'description' => 'Service failure',
-            ])),
-            new Response(400, ['Content-Type' => 'application/json'], json_encode([
-                'code' => 'SERVICE_UNAVAILABLE',
-                'description' => 'Service failure',
-            ])),
-        ]);
-        $handlerStack = HandlerStack::create($mockHandler);
-
-        $client = new Client(['handler' => $handlerStack]);
-
-        $service = new class($client) extends LineworksCalendarService {
-            public function __construct(Client $client)
-            {
-                parent::__construct($client);
-            }
-
-            public function accessToken(): string
-            {
-                return 'token-abc';
-            }
-        };
-
-        $event = $service->makeEvent(
-            'テストイベント',
-            '2024-01-01T10:00:00+09:00',
-            '2024-01-01T11:00:00+09:00'
-        );
-
-        $this->expectException(LineworksServiceUnavailableException::class);
-        $this->expectExceptionMessage('LINE WORKSカレンダーへの登録に失敗しました。(Service failure)');
 
         $service->createEvent('user-123', $event);
     }

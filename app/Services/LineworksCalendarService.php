@@ -98,13 +98,7 @@ class LineworksCalendarService
             ],
         ];
 
-        $maxAttempts = max(1, (int) $this->configValue('retry_attempts', 3));
-        $delayMs = max(0, (int) $this->configValue('retry_delay_ms', 250));
-
         $attempt = 0;
-        $lastException = null;
-        $lastErrorCode = null;
-        $lastErrorDescription = null;
         $context = [
             'user_id' => $userId,
             'calendar_id' => $effectiveCalendarId,
@@ -114,29 +108,24 @@ class LineworksCalendarService
             'event_end' => $event['end']['dateTime'] ?? null,
         ];
 
-        while ($attempt < $maxAttempts) {
+        while (true) {
             $attempt++;
 
             try {
                 $response = $this->client->post($url, $payload);
             } catch (RequestException $exception) {
-                $lastException = $exception;
-
                 $errorDetails = $this->extractErrorDetails($exception->getResponse());
-                $lastErrorCode = $errorDetails['code'] ?? $lastErrorCode;
-                $lastErrorDescription = $errorDetails['description'] ?? $lastErrorDescription;
 
                 if (!$offsetFallbackApplied && $this->shouldApplyStartTimeFallback($eventPayload, $errorDetails)) {
                     $offsetFallbackApplied = true;
                     $eventPayload = $this->withExplicitOffsetDates($eventPayload);
                     $payload['json']['eventComponents'] = [$eventPayload];
-                    $attempt--;
 
                     Log::warning('LINE WORKS start time fallback applied (offset appended).', array_filter(
                         array_merge($context, [
                             'attempt' => $attempt + 1,
-                            'description' => $lastErrorDescription,
-                            'code' => $lastErrorCode,
+                            'description' => $errorDetails['description'] ?? null,
+                            'code' => $errorDetails['code'] ?? null,
                         ]),
                         static fn ($value) => $value !== null && $value !== ''
                     ));
@@ -156,26 +145,17 @@ class LineworksCalendarService
                     static fn ($value) => $value !== null && $value !== ''
                 ));
 
-                if ($this->shouldRetry($errorDetails['code'] ?? null, $attempt, $maxAttempts)) {
-                    $this->sleepForRetry($delayMs, $attempt);
-                    continue;
-                }
+                $message = $this->formatLineworksErrorMessage(
+                    $errorDetails['description'] ?? null,
+                    $errorDetails['code'] ?? null
+                );
 
-                $message = $this->formatLineworksErrorMessage($lastErrorDescription, $lastErrorCode);
-
-                throw $this->buildLineworksException($lastErrorCode, $message, $exception);
+                throw $this->buildLineworksException($errorDetails['code'] ?? null, $message, $exception);
             } catch (GuzzleException $exception) {
-                $lastException = $exception;
-
                 Log::error('LINE WORKSカレンダーへのリクエストで例外が発生しました。', array_merge($context, [
                     'message' => $exception->getMessage(),
                     'attempt' => $attempt,
                 ]));
-
-                if ($this->shouldRetry(null, $attempt, $maxAttempts)) {
-                    $this->sleepForRetry($delayMs, $attempt);
-                    continue;
-                }
 
                 throw new RuntimeException('LINE WORKSカレンダーへの登録に失敗しました。', 0, $exception);
             }
@@ -184,20 +164,17 @@ class LineworksCalendarService
 
             if ($status >= 300) {
                 $errorDetails = $this->parseErrorBody((string) $response->getBody());
-                $lastErrorCode = $errorDetails['code'] ?? $lastErrorCode;
-                $lastErrorDescription = $errorDetails['description'] ?? $lastErrorDescription;
 
                 if (!$offsetFallbackApplied && $this->shouldApplyStartTimeFallback($eventPayload, $errorDetails)) {
                     $offsetFallbackApplied = true;
                     $eventPayload = $this->withExplicitOffsetDates($eventPayload);
                     $payload['json']['eventComponents'] = [$eventPayload];
-                    $attempt--;
 
                     Log::warning('LINE WORKS start time fallback applied (offset appended).', array_filter(
                         array_merge($context, [
                             'attempt' => $attempt + 1,
-                            'description' => $lastErrorDescription,
-                            'code' => $lastErrorCode,
+                            'description' => $errorDetails['description'] ?? null,
+                            'code' => $errorDetails['code'] ?? null,
                         ]),
                         static fn ($value) => $value !== null && $value !== ''
                     ));
@@ -216,14 +193,12 @@ class LineworksCalendarService
                     static fn ($value) => $value !== null && $value !== ''
                 ));
 
-                if ($this->shouldRetry($errorDetails['code'] ?? null, $attempt, $maxAttempts)) {
-                    $this->sleepForRetry($delayMs, $attempt);
-                    continue;
-                }
+                $message = $this->formatLineworksErrorMessage(
+                    $errorDetails['description'] ?? null,
+                    $errorDetails['code'] ?? null
+                );
 
-                $message = $this->formatLineworksErrorMessage($lastErrorDescription, $lastErrorCode);
-
-                throw $this->buildLineworksException($lastErrorCode, $message, $response);
+                throw $this->buildLineworksException($errorDetails['code'] ?? null, $message, $response);
             }
 
             $body = (string) $response->getBody();
@@ -231,10 +206,6 @@ class LineworksCalendarService
 
             return is_array($decoded) ? $decoded : [];
         }
-
-        $message = $this->formatLineworksErrorMessage($lastErrorDescription, $lastErrorCode);
-
-        throw $this->buildLineworksException($lastErrorCode, $message, $lastException);
     }
 
     /**
@@ -334,7 +305,7 @@ class LineworksCalendarService
     private function normalizeEventDateTime(string|CarbonInterface $value, string $timeZone): string
     {
         if ($value instanceof CarbonInterface) {
-            return $value->copy()->setTimezone($timeZone)->format('Y-m-d\TH:i:s');
+            return $value->copy()->setTimezone($timeZone)->format('Y-m-d\TH:i:sP');
         }
 
         try {
@@ -343,7 +314,7 @@ class LineworksCalendarService
             throw new RuntimeException('Invalid event dateTime: ' . $value, 0, $exception);
         }
 
-        return $dateTime->setTimezone($timeZone)->format('Y-m-d\TH:i:s');
+    return $dateTime->setTimezone($timeZone)->format('Y-m-d\TH:i:sP');
     }
 
     public function accessToken(): string
@@ -835,35 +806,6 @@ class LineworksCalendarService
         }
 
         return $result;
-    }
-
-    private function shouldRetry(?string $code, int $attempt, int $maxAttempts): bool
-    {
-        if ($attempt >= $maxAttempts) {
-            return false;
-        }
-
-        if ($code === null) {
-            return false;
-        }
-
-        $retryable = ['SERVICE_UNAVAILABLE'];
-
-        return in_array($code, $retryable, true);
-    }
-
-    private function sleepForRetry(int $delayMs, int $attempt): void
-    {
-        if ($delayMs <= 0) {
-            return;
-        }
-
-        $multiplier = max(1, 2 ** ($attempt - 1));
-        $jitter = random_int(-100, 100);
-
-        $sleepMs = max(0, ($delayMs * $multiplier) + $jitter);
-
-        usleep($sleepMs * 1000);
     }
 
     private function formatLineworksErrorMessage(?string $description, ?string $code): string
