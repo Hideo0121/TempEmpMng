@@ -13,6 +13,7 @@ use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Response;
 use RuntimeException;
 use Tests\TestCase;
+use Illuminate\Support\Facades\Log;
 
 class LineworksCalendarServiceTest extends TestCase
 {
@@ -427,7 +428,6 @@ class LineworksCalendarServiceTest extends TestCase
                 'code' => 'SERVICE_UNAVAILABLE',
                 'description' => 'Service failure',
             ])),
-            new Response(201, ['Content-Type' => 'application/json'], json_encode(['eventId' => 'xyz'])),
         ]);
         $handlerStack = HandlerStack::create($mockHandler);
         $handlerStack->push(Middleware::history($history));
@@ -452,6 +452,12 @@ class LineworksCalendarServiceTest extends TestCase
             '2024-01-01T11:00:00+09:00'
         );
 
+        $expectedPayloadJson = json_encode([
+            'eventComponents' => [$event],
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        Log::spy();
+
         try {
             $service->createEvent('user-123', $event);
             $this->fail('Expected LineworksServiceUnavailableException was not thrown.');
@@ -460,6 +466,11 @@ class LineworksCalendarServiceTest extends TestCase
         }
 
         $this->assertCount(1, $history);
+
+        Log::shouldHaveReceived('error')->once()->withArgs(function ($message, array $context) use ($expectedPayloadJson) {
+            return $message === 'LINE WORKSカレンダーへのリクエストで例外が発生しました。'
+                && ($context['payload_json'] ?? null) === $expectedPayloadJson;
+        });
     }
 
     public function test_create_event_applies_offset_fallback_on_start_time_error(): void
@@ -485,7 +496,6 @@ class LineworksCalendarServiceTest extends TestCase
                 'code' => 'INVALID_PARAMETER',
                 'description' => 'Start time not set',
             ])),
-            new Response(201, ['Content-Type' => 'application/json'], json_encode(['eventId' => 'fallback'])),
         ]);
         $handlerStack = HandlerStack::create($mockHandler);
         $handlerStack->push(Middleware::history($history));
@@ -514,20 +524,40 @@ class LineworksCalendarServiceTest extends TestCase
         $event['start']['dateTime'] = '2024-01-01T10:00:00';
         $event['end']['dateTime'] = '2024-01-01T11:00:00';
 
-        $response = $service->createEvent('user-123', $event);
+        $expectedPayloadJson = json_encode([
+            'eventComponents' => [$event],
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-        $this->assertSame(['eventId' => 'fallback'], $response);
-        $this->assertCount(2, $history);
+        $fallbackPayloadJson = json_encode([
+            'eventComponents' => [[
+                'summary' => 'テストイベント',
+                'start' => [
+                    'dateTime' => '2024-01-01T10:00:00+09:00',
+                    'timeZone' => 'Asia/Tokyo',
+                ],
+                'end' => [
+                    'dateTime' => '2024-01-01T11:00:00+09:00',
+                    'timeZone' => 'Asia/Tokyo',
+                ],
+            ]],
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-        $request = $history[1]['request'];
-        $payload = json_decode((string) $request->getBody(), true);
-        $start = $payload['eventComponents'][0]['start']['dateTime'] ?? null;
-        $end = $payload['eventComponents'][0]['end']['dateTime'] ?? null;
+        Log::spy();
 
-        $this->assertNotNull($start);
-        $this->assertNotNull($end);
-        $this->assertStringEndsWith('+09:00', $start);
-        $this->assertStringEndsWith('+09:00', $end);
+        try {
+            $service->createEvent('user-123', $event);
+            $this->fail('Expected RuntimeException was not thrown.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('LINE WORKSカレンダーへの登録に失敗しました。(Start time not set)', $exception->getMessage());
+        }
+
+        $this->assertCount(1, $history);
+
+        Log::shouldHaveReceived('warning')->once()->withArgs(function ($message, array $context) use ($expectedPayloadJson, $fallbackPayloadJson) {
+            return $message === 'LINE WORKS start time fallback suggested (manual retry required).'
+                && ($context['payload_json'] ?? null) === $expectedPayloadJson
+                && ($context['fallback_payload_json'] ?? null) === $fallbackPayloadJson;
+        });
     }
 
     public function test_create_event_throws_with_error_description(): void
@@ -575,10 +605,29 @@ class LineworksCalendarServiceTest extends TestCase
             '2024-01-01T11:00:00+09:00'
         );
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('LINE WORKSカレンダーへの登録に失敗しました。(Invalid date range)');
+        $expectedPayloadJson = json_encode([
+            'eventComponents' => [$event],
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-        $service->createEvent('user-123', $event);
+        Log::spy();
+
+        try {
+            $service->createEvent('user-123', $event);
+            $this->fail('Expected RuntimeException was not thrown.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('LINE WORKSカレンダーへの登録に失敗しました。(Invalid date range)', $exception->getMessage());
+        }
+
+        Log::shouldHaveReceived('error')->once()->withArgs(function ($message, array $context) use ($expectedPayloadJson) {
+            if (!in_array($message, [
+                'LINE WORKSカレンダーへの登録が失敗しました。',
+                'LINE WORKSカレンダーへのリクエストで例外が発生しました。',
+            ], true)) {
+                return false;
+            }
+
+            return ($context['payload_json'] ?? null) === $expectedPayloadJson;
+        });
     }
 
     public function test_create_interview_event_uses_expected_summary_format(): void
