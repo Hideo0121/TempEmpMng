@@ -305,7 +305,7 @@ class LineworksCalendarService
     private function normalizeEventDateTime(string|CarbonInterface $value, string $timeZone): string
     {
         if ($value instanceof CarbonInterface) {
-            return $value->copy()->setTimezone($timeZone)->format('Y-m-d\TH:i:sP');
+            return $value->copy()->setTimezone($timeZone)->format('Y-m-d\TH:i:s');
         }
 
         try {
@@ -314,7 +314,7 @@ class LineworksCalendarService
             throw new RuntimeException('Invalid event dateTime: ' . $value, 0, $exception);
         }
 
-    return $dateTime->setTimezone($timeZone)->format('Y-m-d\TH:i:sP');
+        return $dateTime->setTimezone($timeZone)->format('Y-m-d\TH:i:s');
     }
 
     public function accessToken(): string

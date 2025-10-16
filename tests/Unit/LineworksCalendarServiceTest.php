@@ -73,6 +73,42 @@ class LineworksCalendarServiceTest extends TestCase
         $this->assertEquals(['eventComponents' => [$event]], $payload);
     }
 
+    public function test_make_event_matches_expected_schema(): void
+    {
+        config()->set('services.lineworks', [
+            'enabled' => true,
+            'auth_url' => 'https://auth.example.com/oauth/token',
+            'api_base' => 'https://lineworks.test/v1',
+            'client_id' => 'client-123',
+            'client_secret' => 'secret-456',
+            'service_account' => 'service-account@test',
+            'private_key_pem' => 'dummy-key',
+            'scope' => 'calendar',
+            'default_tz' => 'Asia/Tokyo',
+        ]);
+
+        $service = new LineworksCalendarService(new Client());
+
+        $event = $service->makeEvent(
+            '社内会議',
+            '2023-12-01T14:00:00',
+            '2023-12-01T15:00:00',
+            ['timeZone' => 'Asia/Tokyo']
+        );
+
+        $this->assertSame([
+            'summary' => '社内会議',
+            'start' => [
+                'dateTime' => '2023-12-01T14:00:00',
+                'timeZone' => 'Asia/Tokyo',
+            ],
+            'end' => [
+                'dateTime' => '2023-12-01T15:00:00',
+                'timeZone' => 'Asia/Tokyo',
+            ],
+        ], $event);
+    }
+
     public function test_create_event_uses_configured_calendar_id(): void
     {
         config()->set('services.lineworks', [

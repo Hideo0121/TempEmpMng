@@ -6,7 +6,6 @@ use App\Exceptions\LineworksServiceUnavailableException;
 use App\Http\Requests\CandidateRequest;
 use App\Http\Requests\ChangeCandidateStatusRequest;
 use App\Http\Requests\UpdateCandidateMemoRequest;
-use App\Jobs\RegisterLineworksInterviewEvent;
 use App\Models\Agency;
 use App\Models\Candidate;
 use App\Models\CandidateStatus;
@@ -695,16 +694,13 @@ class CandidateController extends Controller
         try {
             $lineworks->createInterviewEvent($candidate, $confirmedAt);
         } catch (LineworksServiceUnavailableException $e) {
-            RegisterLineworksInterviewEvent::dispatch($candidate->getKey())
-                ->delay(now()->addMinutes(1));
-
-            Log::warning('LINE WORKS calendar registration deferred for retry', [
+            Log::warning('LINE WORKS calendar registration unavailable', [
                 'candidate_id' => $candidate->getKey(),
                 'message' => $e->getMessage(),
             ]);
 
             return redirect()->route('candidates.show', $routeParams)
-                ->with('lineworks_error', 'LINE WORKSが一時的に利用できないため、登録を自動で再試行します。後ほど結果をご確認ください。');
+                ->with('lineworks_error', 'LINE WORKSが一時的に利用できないため、カレンダー登録は完了していません。時間を置いて再度登録を実行してください。');
         } catch (Throwable $e) {
             Log::error('LINE WORKS calendar registration failed', [
                 'candidate_id' => $candidate->getKey(),
