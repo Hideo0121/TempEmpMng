@@ -76,6 +76,7 @@
             @php
                 $displayJobCategories = $jobCategories->filter(fn ($job) => ($wishJobRowTotals[$job->id] ?? 0) > 0);
                 $weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+                $visitPendingStatusCode = $visitPendingStatusCode ?? \App\Models\CandidateStatus::CODE_VISIT_PENDING;
             @endphp
             @if ($displayJobCategories->isEmpty())
                 <p class="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
@@ -95,8 +96,19 @@
                         </thead>
                         <tbody class="divide-y divide-slate-100">
                             @foreach ($displayJobCategories as $jobCategory)
+                                @php
+                                    $jobFilterQuery = \Illuminate\Support\Arr::query([
+                                        'wish_job[]' => $jobCategory->id,
+                                        'status[]' => $visitPendingStatusCode,
+                                    ]);
+                                    $jobFilterUrl = route('candidates.index') . '?' . $jobFilterQuery;
+                                @endphp
                                 <tr class="hover:bg-slate-50">
-                                    <th scope="row" class="px-4 py-3 text-left font-semibold text-slate-700">{{ $jobCategory->name }}</th>
+                                    <th scope="row" class="px-4 py-3 text-left font-semibold text-slate-700">
+                                        <a href="{{ $jobFilterUrl }}" class="inline-flex items-center font-semibold text-blue-600 hover:text-blue-500 hover:underline">
+                                            {{ $jobCategory->name }}
+                                        </a>
+                                    </th>
                                     @foreach ($statuses as $status)
                                         <td class="px-4 py-3 text-right text-slate-700">{{ number_format($wishJobMatrix[$jobCategory->id][$status->code] ?? 0) }}</td>
                                     @endforeach

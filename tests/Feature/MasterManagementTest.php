@@ -56,7 +56,7 @@ class MasterManagementTest extends TestCase
         $manager = User::factory()->create(['role' => 'manager']);
 
         $status = CandidateStatus::create([
-            'code' => 'visit_pending',
+            'code' => CandidateStatus::CODE_VISIT_PENDING,
             'label' => '職場見学待',
             'color_code' => '#E8F0FE',
             'sort_order' => 10,
@@ -65,7 +65,7 @@ class MasterManagementTest extends TestCase
         ]);
 
         $response = $this->actingAs($manager)->put(route('masters.candidate-statuses.update', $status), [
-            'code' => 'visit_pending',
+            'code' => CandidateStatus::CODE_VISIT_PENDING,
             'label' => '見学調整中',
             'color_code' => '#ffcc00',
             'sort_order' => 5,
@@ -75,7 +75,7 @@ class MasterManagementTest extends TestCase
 
         $response->assertRedirect(route('masters.candidate-statuses.index'));
         $this->assertDatabaseHas('candidate_statuses', [
-            'code' => 'visit_pending',
+            'code' => CandidateStatus::CODE_VISIT_PENDING,
             'label' => '見学調整中',
             'color_code' => '#FFCC00',
             'sort_order' => 5,

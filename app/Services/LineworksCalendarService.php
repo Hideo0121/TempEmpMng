@@ -203,6 +203,24 @@ class LineworksCalendarService
         $body = (string) $response->getBody();
         $decoded = json_decode($body, true);
 
+        $successContext = array_merge($context, [
+            'status' => $status,
+        ]);
+
+        if (is_array($decoded)) {
+            $successContext['response_json'] = $this->encodePayloadForLog($decoded);
+            if (isset($decoded['eventId']) && is_string($decoded['eventId'])) {
+                $successContext['event_id'] = $decoded['eventId'];
+            }
+        } else {
+            $successContext['response_body'] = $body;
+        }
+
+        Log::info('LINE WORKSカレンダーへの登録が正常に完了しました。', array_filter(
+            $successContext,
+            static fn ($value) => $value !== null && $value !== ''
+        ));
+
         return is_array($decoded) ? $decoded : [];
     }
 

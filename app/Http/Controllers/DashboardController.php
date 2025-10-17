@@ -176,6 +176,7 @@ class DashboardController extends Controller
             'todayVisitCount' => $todayVisitCount,
             'statuses' => $statuses,
             'jobCategories' => $jobCategories,
+            'visitPendingStatusCode' => CandidateStatus::CODE_VISIT_PENDING,
             'wishJobMatrix' => $wishJobMatrix,
             'wishJobRowTotals' => $wishJobRowTotals,
             'wishJobColumnTotals' => $wishJobColumnTotals,

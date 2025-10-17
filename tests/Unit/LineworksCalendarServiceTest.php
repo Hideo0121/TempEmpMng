@@ -60,6 +60,8 @@ class LineworksCalendarServiceTest extends TestCase
             '2024-01-01T11:00:00+09:00'
         );
 
+        Log::spy();
+
         $response = $service->createEvent('user-123', $event);
 
         $this->assertSame(['eventId' => 'abc'], $response);
@@ -72,6 +74,17 @@ class LineworksCalendarServiceTest extends TestCase
 
         $payload = json_decode((string) $request->getBody(), true);
         $this->assertEquals(['eventComponents' => [$event]], $payload);
+
+    $expectedPayloadJson = json_encode(['eventComponents' => [$event]], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $expectedResponseJson = json_encode(['eventId' => 'abc'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    Log::shouldHaveReceived('info')->once()->withArgs(function ($message, array $context) use ($expectedPayloadJson, $expectedResponseJson) {
+            return $message === 'LINE WORKSカレンダーへの登録が正常に完了しました。'
+                && ($context['event_id'] ?? null) === 'abc'
+                && ($context['payload_json'] ?? null) === $expectedPayloadJson
+        && ($context['response_json'] ?? null) === $expectedResponseJson
+                && ($context['status'] ?? null) === 201;
+        });
     }
 
     public function test_make_event_matches_expected_schema(): void

@@ -9,6 +9,7 @@ use App\Models\Interview;
 use App\Models\JobCategory;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
@@ -32,16 +33,16 @@ class DashboardMetricsTest extends TestCase
             'is_active' => true,
         ]);
 
-        $statusEntry = CandidateStatus::create([
-            'code' => 'ENTRY',
-            'label' => 'エントリー',
+        $statusVisitPending = CandidateStatus::create([
+            'code' => CandidateStatus::CODE_VISIT_PENDING,
+            'label' => '職場見学待',
             'sort_order' => 1,
             'is_active' => true,
             'is_employed_state' => false,
         ]);
 
-        $statusVisit = CandidateStatus::create([
-            'code' => 'VISIT',
+        $statusVisitConfirmed = CandidateStatus::create([
+            'code' => 'visit_confirmed',
             'label' => '見学確定',
             'sort_order' => 2,
             'is_active' => true,
@@ -78,7 +79,7 @@ class DashboardMetricsTest extends TestCase
             'wish_job1_id' => $jobOffice->id,
             'introduced_on' => Carbon::today(),
             'handler1_user_id' => $user->id,
-            'status_code' => $statusEntry->code,
+            'status_code' => $statusVisitPending->code,
             'status_changed_on' => Carbon::today(),
             'created_by' => $user->id,
             'updated_by' => $user->id,
@@ -92,7 +93,7 @@ class DashboardMetricsTest extends TestCase
             'introduced_on' => Carbon::today(),
             'handler1_user_id' => $user->id,
             'handler2_user_id' => $user->id,
-            'status_code' => $statusVisit->code,
+            'status_code' => $statusVisitConfirmed->code,
             'status_changed_on' => Carbon::today(),
             'created_by' => $user->id,
             'updated_by' => $user->id,
@@ -156,8 +157,16 @@ class DashboardMetricsTest extends TestCase
             'interview_to' => $rangeEnd,
         ]);
 
-    $response->assertSee('href="' . e($cellUrl) . '"', false);
-    $response->assertSee('href="' . e($rowUrl) . '"', false);
+        $response->assertSee('href="' . e($cellUrl) . '"', false);
+        $response->assertSee('href="' . e($rowUrl) . '"', false);
+
+        $wishJobQuery = Arr::query([
+            'wish_job[]' => $jobOffice->id,
+            'status[]' => CandidateStatus::CODE_VISIT_PENDING,
+        ]);
+        $wishJobUrl = route('candidates.index') . '?' . $wishJobQuery;
+
+        $response->assertSee('href="' . e($wishJobUrl) . '"', false);
 
         $searchResponse = $this->actingAs($user)->get(route('candidates.index', ['keyword' => '候補者', 'keyword_logic' => 'and']));
         $searchResponse->assertOk();

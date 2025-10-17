@@ -276,3 +276,16 @@ curl -X POST http://localhost:8000/lineworks/events/sample \
 - 日時を受け渡す処理では、入力源を問わずタイムゾーンと ISO8601 形式を強制するヘルパーを用意しておく。
 - オプション配列をそのまま JSON に流し込むのではなく、API 仕様に沿った構造へ整形する。
 
+### 2025-10-17 正常登録時のログ出力
+**背景**
+- LINE WORKS カレンダーへの登録が成功した場合にも、運用チームが操作履歴を追跡できるようログ出力を強化。
+
+**出力内容**
+- ログレベル: `info`
+- メッセージ: `LINE WORKSカレンダーへの登録が正常に完了しました。`
+- 主要コンテキスト: `user_id`, `calendar_id`, `calendar_name`, `event_summary`, `event_start`, `event_end`, `payload_json` (送信 JSON)、`status` (HTTP ステータス)、`event_id` (レスポンスに含まれる場合)、`response_json` (レスポンス JSON)
+
+**備考**
+- `payload_json` / `response_json` は改行や日本語を保持したまま JSON 文字列化されるため、障害調査時にそのまま `jq` などへ渡して解析可能。
+- 正常系を含めたログが揃うことで、直近の登録状況を Kibana 等から時系列で把握しやすくなる。
+

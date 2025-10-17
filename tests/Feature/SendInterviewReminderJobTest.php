@@ -6,6 +6,7 @@ use App\Jobs\SendInterviewReminderJob;
 use App\Mail\InterviewReminderMail;
 use App\Models\Agency;
 use App\Models\Candidate;
+use App\Models\CandidateStatus;
 use App\Models\Interview;
 use App\Models\Notification;
 use App\Models\User;
@@ -61,7 +62,7 @@ class SendInterviewReminderJobTest extends TestCase
                 'name_kana' => 'ヤマダ タロウ',
                 'agency_id' => $agency->id,
                 'introduced_on' => '2025-09-20',
-                'status_code' => 'visit_pending',
+                'status_code' => CandidateStatus::CODE_VISIT_PENDING,
                 'handler1_user_id' => $handler1->id,
                 'handler2_user_id' => $handler2->id,
                 'created_by' => $owner->id,
@@ -135,7 +136,7 @@ class SendInterviewReminderJobTest extends TestCase
                 'name_kana' => 'タカハシ ジロウ',
                 'agency_id' => $agency->id,
                 'introduced_on' => '2025-09-20',
-                'status_code' => 'visit_pending',
+                'status_code' => CandidateStatus::CODE_VISIT_PENDING,
                 'handler1_user_id' => $handler->id,
                 'created_by' => $owner->id,
             ]);
@@ -195,7 +196,7 @@ class SendInterviewReminderJobTest extends TestCase
                 'name_kana' => 'サトウ ハナコ',
                 'agency_id' => $agency->id,
                 'introduced_on' => '2025-09-20',
-                'status_code' => 'visit_pending',
+                'status_code' => CandidateStatus::CODE_VISIT_PENDING,
                 'handler1_user_id' => $handler->id,
                 'created_by' => $owner->id,
             ]);
@@ -231,7 +232,7 @@ class SendInterviewReminderJobTest extends TestCase
                 'name_kana' => 'ジュシンシャ ナシ',
                 'agency_id' => Agency::create(['name' => '派遣先'])->id,
                 'introduced_on' => '2025-09-20',
-                'status_code' => 'visit_pending',
+                'status_code' => CandidateStatus::CODE_VISIT_PENDING,
             ]);
 
             $interview = Interview::create([
@@ -258,13 +259,14 @@ class SendInterviewReminderJobTest extends TestCase
     private function seedBaselineData(): void
     {
         \DB::table('candidate_statuses')->insert([
-            'code' => 'visit_pending',
-            'label' => '職場見学待ち',
-            'color_code' => '#0044cc',
-            'sort_order' => 10,
-            'is_active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+                'code' => CandidateStatus::CODE_VISIT_PENDING,
+                'label' => '職場見学待',
+                'color_code' => '#0044cc',
+                'sort_order' => 10,
+                'is_active' => true,
+                'is_employed_state' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
     }
 }

@@ -17,7 +17,7 @@
                 <div>
                     <label for="code" class="block text-sm font-semibold text-slate-700">コード <span class="text-red-500">*</span></label>
                     <input type="text" id="code" name="code" value="{{ old('code') }}" maxlength="20"
-                        placeholder="例: visit_pending"
+                        placeholder="例: s_t01"
                         class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200" required>
                     <p class="mt-1 text-xs text-slate-500">英数字・ハイフン・アンダースコアを使用できます。</p>
                     @error('code')
