@@ -898,11 +898,31 @@ class LineworksCalendarService
         }
 
         if ($candidate->other_conditions) {
-            $lines[] = '---';
-            $lines[] = 'その他条件・メモ:';
-            $lines[] = $candidate->other_conditions;
+            $formattedOtherConditions = $this->normalizeOtherConditions($candidate->other_conditions);
+
+            if ($formattedOtherConditions !== null && $formattedOtherConditions !== '') {
+                $lines[] = '---';
+                $lines[] = 'その他条件・メモ:';
+                $lines[] = $formattedOtherConditions;
+            }
         }
 
         return implode("\n", $lines);
+    }
+
+    private function normalizeOtherConditions(mixed $value): ?string
+    {
+        if (!is_string($value)) {
+            return null;
+        }
+
+        $normalized = preg_replace("/\r\n|\r/", "\n", $value);
+        if (!is_string($normalized)) {
+            $normalized = str_replace(["\r\n", "\r"], "\n", $value);
+        }
+
+        $normalized = trim($normalized);
+
+        return $normalized === '' ? null : $normalized;
     }
 }

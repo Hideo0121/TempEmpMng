@@ -679,4 +679,60 @@ class LineworksCalendarServiceTest extends TestCase
 
         $this->assertSame('職場見学(山田 太郎)', $collector->captured['event']['summary']);
     }
+
+    public function test_create_interview_event_preserves_other_conditions_formatting(): void
+    {
+        config()->set('services.lineworks', [
+            'enabled' => true,
+            'auth_url' => 'https://auth.example.com/oauth/token',
+            'api_base' => 'https://lineworks.test/v1',
+            'client_id' => 'client-123',
+            'client_secret' => 'secret-456',
+            'service_account' => 'service-account@test',
+            'private_key_pem' => 'dummy-key',
+            'scope' => 'calendar',
+            'default_tz' => 'Asia/Tokyo',
+            'calendar_id' => 'c_abcdef',
+            'retry_attempts' => 1,
+            'retry_delay_ms' => 0,
+        ]);
+
+        $collector = new class extends LineworksCalendarService {
+            public array $captured = [];
+
+            public function __construct()
+            {
+                parent::__construct(new Client());
+            }
+
+            public function accessToken(): string
+            {
+                return 'token-abc';
+            }
+
+            public function createEvent(string $userId, array $event, ?string $calendarId = null): array
+            {
+                $this->captured = [
+                    'userId' => $userId,
+                    'event' => $event,
+                    'calendarId' => $calendarId,
+                ];
+
+                return ['ok' => true];
+            }
+        };
+
+        $candidate = new Candidate([
+            'name' => '山田 太郎',
+            'other_conditions' => "第一行,\r\n第二行,情報",
+        ]);
+
+        $scheduledAt = Carbon::parse('2025-01-15 10:00:00', 'Asia/Tokyo');
+
+        $collector->createInterviewEvent($candidate, $scheduledAt);
+
+        $expectedDescription = "候補者: 山田 太郎\n---\nその他条件・メモ:\n第一行,\n第二行,情報";
+
+        $this->assertSame($expectedDescription, $collector->captured['event']['description']);
+    }
 }
