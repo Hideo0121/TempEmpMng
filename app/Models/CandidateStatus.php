@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CandidateStatus extends Model
 {
-    public const CODE_EMPLOYED = 'ST03';
+    public const CODE_EMPLOYED = 's_t03';
     public const CODE_VISIT_PENDING = 's_t01';
 
     protected $primaryKey = 'code';

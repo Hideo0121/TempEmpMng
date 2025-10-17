@@ -141,6 +141,9 @@ class DashboardController extends Controller
             ->groupByRaw('decided_job_category_id, DATE(employment_start_at)')
             ->get();
 
+        $employmentFilterStart = $today->toDateString();
+        $employmentFilterEnd = $today->copy()->addDays(7)->toDateString();
+
         $employmentStartDates = $employmentStartStats
             ->pluck('start_date')
             ->unique()
@@ -193,6 +196,8 @@ class DashboardController extends Controller
             'employmentStartRowTotals' => $employmentStartRowTotals,
             'employmentStartColumnTotals' => $employmentStartColumnTotals,
             'employmentStartGrandTotal' => $employmentStartGrandTotal,
+            'employmentStartFilterStart' => $employmentFilterStart,
+            'employmentStartFilterEnd' => $employmentFilterEnd,
         ]);
     }
 }

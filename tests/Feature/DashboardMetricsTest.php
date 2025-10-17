@@ -58,6 +58,8 @@ class DashboardMetricsTest extends TestCase
         ]);
         CandidateStatus::refreshEmployedCache();
 
+        $todayDate = Carbon::today();
+
         $jobOffice = JobCategory::create([
             'name' => '事務',
             'sort_order' => 1,
@@ -77,10 +79,10 @@ class DashboardMetricsTest extends TestCase
             'name_kana' => 'キョウノコウホシャ',
             'agency_id' => $agency->id,
             'wish_job1_id' => $jobOffice->id,
-            'introduced_on' => Carbon::today(),
+            'introduced_on' => $todayDate->copy(),
             'handler1_user_id' => $user->id,
             'status_code' => $statusVisitPending->code,
-            'status_changed_on' => Carbon::today(),
+            'status_changed_on' => $todayDate->copy(),
             'created_by' => $user->id,
             'updated_by' => $user->id,
         ]);
@@ -90,11 +92,11 @@ class DashboardMetricsTest extends TestCase
             'name_kana' => 'アシタノコウホシャ',
             'agency_id' => $agency->id,
             'wish_job1_id' => $jobSales->id,
-            'introduced_on' => Carbon::today(),
+            'introduced_on' => $todayDate->copy(),
             'handler1_user_id' => $user->id,
             'handler2_user_id' => $user->id,
             'status_code' => $statusVisitConfirmed->code,
-            'status_changed_on' => Carbon::today(),
+            'status_changed_on' => $todayDate->copy(),
             'created_by' => $user->id,
             'updated_by' => $user->id,
         ]);
@@ -105,24 +107,24 @@ class DashboardMetricsTest extends TestCase
             'agency_id' => $agency->id,
             'wish_job1_id' => $jobSales->id,
             'decided_job_category_id' => $jobOffice->id,
-            'introduced_on' => Carbon::today(),
+            'introduced_on' => $todayDate->copy(),
             'handler1_user_id' => $user->id,
             'status_code' => $statusEmployed->code,
-            'status_changed_on' => Carbon::today(),
-            'employment_start_at' => Carbon::today()->addDays(3)->setTime(10, 0),
+            'status_changed_on' => $todayDate->copy(),
+            'employment_start_at' => $todayDate->copy()->addDays(3)->setTime(10, 0),
             'created_by' => $user->id,
             'updated_by' => $user->id,
         ]);
 
         Interview::create([
             'candidate_id' => $candidateToday->id,
-            'scheduled_at' => Carbon::today()->setTime(9, 0),
+            'scheduled_at' => $todayDate->copy()->setTime(9, 0),
             'remind_30m_enabled' => true,
         ]);
 
         Interview::create([
             'candidate_id' => $candidateNext->id,
-            'scheduled_at' => Carbon::tomorrow()->setTime(14, 0),
+            'scheduled_at' => $todayDate->copy()->addDay()->setTime(14, 0),
             'remind_30m_enabled' => false,
         ]);
 
@@ -142,8 +144,8 @@ class DashboardMetricsTest extends TestCase
         $response->assertSeeText('就業決定');
         $response->assertSeeText('決定済み候補者');
 
-        $today = Carbon::today()->toDateString();
-        $rangeEnd = Carbon::today()->addDays(6)->toDateString();
+    $today = $todayDate->toDateString();
+    $rangeEnd = $todayDate->copy()->addDays(6)->toDateString();
 
         $cellUrl = route('candidates.index', [
             'handler' => $user->id,
@@ -167,6 +169,16 @@ class DashboardMetricsTest extends TestCase
         $wishJobUrl = route('candidates.index') . '?' . $wishJobQuery;
 
         $response->assertSee('href="' . e($wishJobUrl) . '"', false);
+
+        $employmentQuery = Arr::query([
+            'decided_job[]' => $jobOffice->id,
+            'status[]' => CandidateStatus::CODE_EMPLOYED,
+            'employment_start_from' => $today,
+            'employment_start_to' => $todayDate->copy()->addDays(7)->toDateString(),
+        ]);
+        $employmentUrl = route('candidates.index') . '?' . $employmentQuery;
+
+        $response->assertSee('href="' . e($employmentUrl) . '"', false);
 
         $searchResponse = $this->actingAs($user)->get(route('candidates.index', ['keyword' => '候補者', 'keyword_logic' => 'and']));
         $searchResponse->assertOk();

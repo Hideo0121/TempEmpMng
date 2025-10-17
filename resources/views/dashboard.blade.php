@@ -230,6 +230,9 @@
             @php
                 $employmentStartDateKeys = $employmentStartDates->map->toDateString();
                 $employmentStartDisplayCategories = $employmentStartCategories->filter(fn ($category) => ($employmentStartRowTotals[$category->id] ?? 0) > 0);
+                $employmentStatusCode = \App\Models\CandidateStatus::CODE_EMPLOYED;
+                $employmentStartFilterStart = $employmentStartFilterStart ?? $today->toDateString();
+                $employmentStartFilterEnd = $employmentStartFilterEnd ?? $today->copy()->addDays(7)->toDateString();
             @endphp
             @if ($employmentStartDateKeys->isEmpty() || $employmentStartDisplayCategories->isEmpty())
                 <p class="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
@@ -249,8 +252,21 @@
                         </thead>
                         <tbody class="divide-y divide-slate-100">
                             @foreach ($employmentStartDisplayCategories as $jobCategory)
+                                @php
+                                    $employmentFilterQuery = \Illuminate\Support\Arr::query([
+                                        'decided_job[]' => $jobCategory->id,
+                                        'status[]' => $employmentStatusCode,
+                                        'employment_start_from' => $employmentStartFilterStart,
+                                        'employment_start_to' => $employmentStartFilterEnd,
+                                    ]);
+                                    $employmentFilterUrl = route('candidates.index') . '?' . $employmentFilterQuery;
+                                @endphp
                                 <tr class="hover:bg-slate-50">
-                                    <th scope="row" class="px-4 py-3 text-left font-semibold text-slate-700">{{ $jobCategory->name }}</th>
+                                    <th scope="row" class="px-4 py-3 text-left font-semibold text-slate-700">
+                                        <a href="{{ $employmentFilterUrl }}" class="inline-flex items-center font-semibold text-blue-600 hover:text-blue-500 hover:underline">
+                                            {{ $jobCategory->name }}
+                                        </a>
+                                    </th>
                                     @foreach ($employmentStartDateKeys as $dateKey)
                                         <td class="px-4 py-3 text-right text-slate-700">
                                             {{ number_format($employmentStartMatrix[$jobCategory->id][$dateKey] ?? 0) }}
