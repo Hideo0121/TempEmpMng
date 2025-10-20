@@ -736,6 +736,7 @@ class CandidateController extends Controller
                 $candidate->decided_job_category_id = $decidedJobId;
             } else {
                 $candidate->decided_job_category_id = null;
+                $candidate->employment_start_at = null;
             }
 
             $candidate->updated_by = $user?->id;
@@ -814,11 +815,18 @@ class CandidateController extends Controller
             'introduction_note' => $data['introduction_note'] ?? null,
             'status_code' => $data['status'],
             'status_changed_on' => $data['status_changed_on'] ?? null,
-            'employment_start_at' => $this->combineDateTime($data['employment_start_date'] ?? null, $data['employment_start_time'] ?? null),
             'assignment_worker_code_a' => $data['assignment_worker_code_a'] ?? null,
             'assignment_worker_code_b' => $data['assignment_worker_code_b'] ?? null,
             'assignment_locker' => $data['assignment_locker'] ?? null,
         ];
+
+        $employmentStartAt = $this->combineDateTime($data['employment_start_date'] ?? null, $data['employment_start_time'] ?? null);
+
+        if (!CandidateStatus::isEmployed((string) ($data['status'] ?? ''))) {
+            $employmentStartAt = null;
+        }
+
+        $attributes['employment_start_at'] = $employmentStartAt;
 
         if (!$candidate || !$candidate->exists) {
             $attributes['created_by'] = $user?->id;
