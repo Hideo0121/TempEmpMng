@@ -52,6 +52,7 @@
     $currentPerPage = (int) ($filters['per_page'] ?? ($perPageOptions[0] ?? 10));
     $namesParameters = request()->except('page');
     $namesUrl = route('candidates.names', $namesParameters, false);
+    $assignmentImportUrl = route('candidates.assignments.clipboard');
     $multiSelectSummary = static function (array $selected, $options, string $idKey = 'id', string $labelKey = 'name'): string {
         if (empty($selected)) {
             return 'すべて';
@@ -289,6 +290,7 @@
                 <span>{{ $sortDescription }}</span>
             </div>
             <div class="flex items-center gap-3 text-sm">
+                <button type="button" class="rounded-full border border-emerald-200 px-3 py-1 font-semibold text-emerald-600 transition hover:bg-emerald-50" data-assign-from-clipboard data-assign-url="{{ $assignmentImportUrl }}">アサイン情報登録</button>
                 <button type="button" class="rounded-full border border-blue-200 px-3 py-1 font-semibold text-blue-600 transition hover:bg-blue-50" data-copy-names data-copy-names-url="{{ $namesUrl }}">氏名コピー</button>
                 <a href="{{ route('candidates.export', request()->query()) }}"
                     class="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600 transition hover:bg-slate-200">CSVエクスポート</a>
@@ -706,6 +708,178 @@
             };
 
             document.querySelectorAll('[data-multiselect]').forEach((root) => initMultiSelect(root));
+
+            const assignButton = document.querySelector('[data-assign-from-clipboard]');
+            if (assignButton) {
+                const assignOriginalLabel = assignButton.textContent.trim();
+                const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
+                const csrfToken = csrfTokenMeta ? csrfTokenMeta.getAttribute('content') || '' : '';
+
+                const resetAssignButton = () => {
+                    assignButton.textContent = assignOriginalLabel;
+                    assignButton.disabled = false;
+                    assignButton.classList.remove('bg-rose-50', 'text-rose-600', 'border-rose-200', 'bg-emerald-50', 'text-emerald-600', 'border-emerald-200');
+                };
+
+                const showAssignError = (message) => {
+                    assignButton.textContent = message;
+                    assignButton.disabled = true;
+                    assignButton.classList.remove('bg-emerald-50', 'text-emerald-600', 'border-emerald-200');
+                    assignButton.classList.add('bg-rose-50', 'text-rose-600', 'border-rose-200');
+                    setTimeout(() => {
+                        resetAssignButton();
+                    }, 2000);
+                };
+
+                const showAssignLoading = (message) => {
+                    assignButton.textContent = message;
+                    assignButton.disabled = true;
+                    assignButton.classList.remove('bg-rose-50', 'text-rose-600', 'border-rose-200', 'bg-emerald-50', 'text-emerald-600', 'border-emerald-200');
+                };
+
+                const showAssignSuccess = (message) => {
+                    assignButton.textContent = message;
+                    assignButton.disabled = true;
+                    assignButton.classList.remove('bg-rose-50', 'text-rose-600', 'border-rose-200');
+                    assignButton.classList.add('bg-emerald-50', 'text-emerald-600', 'border-emerald-200');
+                };
+
+                assignButton.addEventListener('click', async () => {
+                    const assignUrl = assignButton.dataset.assignUrl || '';
+
+                    if (!assignUrl) {
+                        showAssignError('コピーされたデータフォーマットが不正です');
+                        return;
+                    }
+
+                    if (!navigator.clipboard || typeof navigator.clipboard.readText !== 'function') {
+                        showAssignError('セットするデータがありません');
+                        return;
+                    }
+
+                    showAssignLoading('読み込み中...');
+
+                    let clipboardText = '';
+                    try {
+                        clipboardText = await navigator.clipboard.readText();
+                    } catch (error) {
+                        showAssignError('セットするデータがありません');
+                        return;
+                    }
+
+                    const normalizedText = clipboardText.replace(/\r\n/g, '\n').trim();
+                    if (!normalizedText) {
+                        showAssignError('セットするデータがありません');
+                        return;
+                    }
+
+                    const lines = normalizedText
+                        .split('\n')
+                        .map((line) => line.trim())
+                        .filter((line) => line.length > 0);
+
+                    if (lines.length === 0) {
+                        showAssignError('セットするデータがありません');
+                        return;
+                    }
+
+                    const entries = [];
+                    const seenIds = new Set();
+
+                    for (const line of lines) {
+                        const columns = line.split('\t');
+
+                        if (columns.length !== 6) {
+                            showAssignError('コピーされたデータフォーマットが不正です');
+                            return;
+                        }
+
+                        const idRaw = (columns[2] ?? '').trim();
+                        if (!/^\d+$/.test(idRaw)) {
+                            showAssignError('コピーされたデータフォーマットが不正です');
+                            return;
+                        }
+
+                        const id = parseInt(idRaw, 10);
+                        if (!Number.isInteger(id) || id <= 0) {
+                            showAssignError('コピーされたデータフォーマットが不正です');
+                            return;
+                        }
+
+                        if (seenIds.has(id)) {
+                            showAssignError('コピーされたデータフォーマットが不正です');
+                            return;
+                        }
+
+                        const codeA = (columns[3] ?? '').trim();
+                        const codeB = (columns[4] ?? '').trim();
+                        const locker = (columns[5] ?? '').trim();
+
+                        if (!codeA || !codeB || !locker) {
+                            showAssignError('コピーされたデータフォーマットが不正です');
+                            return;
+                        }
+
+                        entries.push({
+                            id,
+                            assignment_worker_code_a: codeA,
+                            assignment_worker_code_b: codeB,
+                            assignment_locker: locker,
+                        });
+                        seenIds.add(id);
+                    }
+
+                    showAssignLoading('送信中...');
+
+                    try {
+                        const response = await fetch(assignUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({ entries }),
+                        });
+
+                        const payload = await response.json().catch(() => null);
+                        const responseMessage = payload && typeof payload === 'object' && typeof payload.message === 'string'
+                            ? payload.message
+                            : '';
+
+                        if (!response.ok) {
+                            const message = responseMessage !== '' ? responseMessage : 'コピーされたデータフォーマットが不正です';
+                            showAssignError(message);
+                            return;
+                        }
+
+                        let ids = [];
+                        if (payload && Array.isArray(payload.ids)) {
+                            ids = payload.ids.filter((value) => Number.isInteger(value) && value > 0);
+                        }
+
+                        if (ids.length === 0) {
+                            showAssignSuccess('抽出中...');
+                            window.location.reload();
+                            return;
+                        }
+
+                        showAssignSuccess('抽出中...');
+
+                        const url = new URL(window.location.href);
+                        const keyword = ids.map((value) => `ID:${value}`).join(' ');
+                        url.searchParams.set('keyword', keyword);
+                        url.searchParams.set('keyword_logic', 'or');
+                        url.searchParams.delete('page');
+
+                        window.location.assign(url.toString());
+                    } catch (error) {
+                        showAssignError('登録に失敗しました');
+                    }
+                });
+            }
 
             const copyNamesButton = document.querySelector('[data-copy-names]');
             if (copyNamesButton) {

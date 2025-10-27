@@ -200,28 +200,45 @@ class CandidateController extends Controller
         }
 
         if ($keyword = (string) $request->string('keyword')->trim()) {
-            $keyword = mb_convert_kana($keyword, 's');
-            $phrases = preg_split('/\s+/', $keyword, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $normalizedKeyword = mb_convert_kana($keyword, 's');
+            $phrases = preg_split('/\s+/', $normalizedKeyword, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $phrases = array_values(array_filter($phrases, static fn ($phrase) => trim($phrase) !== ''));
+
+            if (empty($phrases)) {
+                $phrases = [$normalizedKeyword];
+            }
+
             $logic = strtolower((string) $request->query('keyword_logic', 'and'));
             $useOr = $logic === 'or';
 
-            if (empty($phrases)) {
-                $query->where(function ($inner) use ($keyword) {
-                    $inner->where('name', 'like', "%{$keyword}%")
-                        ->orWhere('name_kana', 'like', "%{$keyword}%")
-                        ->orWhere('other_conditions', 'like', "%{$keyword}%");
-                });
-            } else {
-                $query->where(function ($outer) use ($phrases, $useOr) {
-                    foreach ($phrases as $phrase) {
-                        $outer->{$useOr ? 'orWhere' : 'where'}(function ($inner) use ($phrase) {
-                            $inner->where('name', 'like', "%{$phrase}%")
-                                ->orWhere('name_kana', 'like', "%{$phrase}%")
-                                ->orWhere('other_conditions', 'like', "%{$phrase}%");
-                        });
+            $query->where(function ($outer) use ($phrases, $useOr) {
+                $isFirst = true;
+
+                foreach ($phrases as $phrase) {
+                    $phrase = trim((string) $phrase);
+
+                    if ($phrase === '') {
+                        continue;
                     }
-                });
-            }
+
+                    $method = $useOr && !$isFirst ? 'orWhere' : 'where';
+                    $outer->{$method}(function ($inner) use ($phrase) {
+                        $candidateId = $this->parseCandidateIdKeyword($phrase);
+
+                        if ($candidateId !== null) {
+                            $inner->where('candidates.id', $candidateId);
+
+                            return;
+                        }
+
+                        $inner->where('name', 'like', "%{$phrase}%")
+                            ->orWhere('name_kana', 'like', "%{$phrase}%")
+                            ->orWhere('other_conditions', 'like', "%{$phrase}%");
+                    });
+
+                    $isFirst = false;
+                }
+            });
         }
 
         $agencyIds = $this->normalizeIdValues($request->input('agency'));
@@ -1069,6 +1086,127 @@ class CandidateController extends Controller
         ]);
     }
 
+    public function registerAssignmentsFromClipboard(Request $request): JsonResponse
+    {
+        $entries = $request->input('entries');
+
+        if (!is_array($entries) || empty($entries)) {
+            return $this->assignmentFormatErrorResponse();
+        }
+
+        $normalizedEntries = [];
+        $seenIds = [];
+
+        foreach ($entries as $entry) {
+            if (!is_array($entry)) {
+                return $this->assignmentFormatErrorResponse();
+            }
+
+            $idValue = $entry['id'] ?? null;
+            $id = $this->normalizeCandidateId($idValue);
+
+            if ($id === null || $id <= 0) {
+                return $this->assignmentFormatErrorResponse();
+            }
+
+            if (in_array($id, $seenIds, true)) {
+                return $this->assignmentFormatErrorResponse();
+            }
+
+            $codeAInput = isset($entry['assignment_worker_code_a']) ? trim((string) $entry['assignment_worker_code_a']) : '';
+            $codeBInput = isset($entry['assignment_worker_code_b']) ? trim((string) $entry['assignment_worker_code_b']) : '';
+            $lockerInput = isset($entry['assignment_locker']) ? trim((string) $entry['assignment_locker']) : '';
+
+            if ($codeAInput === '' || $codeBInput === '' || $lockerInput === '') {
+                return $this->assignmentFormatErrorResponse();
+            }
+
+            $normalizedCodeA = $this->normalizeAssignmentWorkerCode($codeAInput);
+            $normalizedCodeB = $this->normalizeAssignmentWorkerCode($codeBInput);
+            $normalizedLocker = $this->normalizeAssignmentLocker($lockerInput);
+
+            if ($normalizedCodeA === '' || $normalizedCodeB === '') {
+                return $this->assignmentFormatErrorResponse();
+            }
+
+            if (!preg_match('/^\d-\d-\d$/', $normalizedLocker)) {
+                return response()->json([
+                    'message' => 'ロッカーフォーマットが不正です',
+                ], 422);
+            }
+
+            $normalizedEntries[] = [
+                'id' => $id,
+                'assignment_worker_code_a' => $normalizedCodeA,
+                'assignment_worker_code_b' => $normalizedCodeB,
+                'assignment_locker' => $normalizedLocker,
+            ];
+
+            $seenIds[] = $id;
+        }
+
+        $orderedIds = array_map(static fn ($entry) => $entry['id'], $normalizedEntries);
+        $userId = $request->user()?->id;
+
+        try {
+            DB::transaction(function () use ($normalizedEntries, $orderedIds, $userId) {
+                $candidates = Candidate::query()
+                    ->whereIn('id', $orderedIds)
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('id');
+
+                $missingIds = array_diff($orderedIds, $candidates->keys()->all());
+
+                if (!empty($missingIds)) {
+                    $labels = array_map(static fn ($id) => "ID:{$id}", $missingIds);
+
+                    throw ValidationException::withMessages([
+                        'entries' => implode('、', $labels) . ' に該当する候補者が見つかりません',
+                    ]);
+                }
+
+                foreach ($normalizedEntries as $entry) {
+                    /** @var Candidate $candidate */
+                    $candidate = $candidates->get($entry['id']);
+
+                    if ($candidate && $this->candidateHasExistingAssignment($candidate)) {
+                        throw ValidationException::withMessages([
+                            'entries' => '既に登録があるため続行できません',
+                        ]);
+                    }
+                }
+
+                foreach ($normalizedEntries as $entry) {
+                    /** @var Candidate $candidate */
+                    $candidate = $candidates->get($entry['id']);
+
+                    if (!$candidate) {
+                        continue;
+                    }
+
+                    $candidate->assignment_worker_code_a = $entry['assignment_worker_code_a'];
+                    $candidate->assignment_worker_code_b = $entry['assignment_worker_code_b'];
+                    $candidate->assignment_locker = $entry['assignment_locker'];
+                    $candidate->updated_by = $userId;
+                    $candidate->save();
+                }
+            });
+        } catch (ValidationException $exception) {
+            $errors = $exception->errors();
+            $message = $errors['entries'][0] ?? 'コピーされたデータフォーマットが不正です';
+
+            return response()->json([
+                'message' => $message,
+            ], 422);
+        }
+
+        return response()->json([
+            'message' => 'アサイン情報を登録しました。',
+            'ids' => $orderedIds,
+        ]);
+    }
+
     private function formOptions(): array
     {
         return [
@@ -1092,5 +1230,65 @@ class CandidateController extends Controller
                 ->get(),
             'employedStatusCodes' => CandidateStatus::employedCodes(),
         ];
+    }
+
+    private function parseCandidateIdKeyword(string $phrase): ?int
+    {
+        if (preg_match('/^ID:(\d+)$/i', $phrase, $matches)) {
+            $raw = ltrim($matches[1], '0');
+            $id = $raw === '' ? 0 : (int) $raw;
+
+            return $id > 0 ? $id : null;
+        }
+
+        return null;
+    }
+
+    private function normalizeCandidateId(mixed $value): ?int
+    {
+        if (is_int($value) && $value > 0) {
+            return $value;
+        }
+
+        if (is_string($value)) {
+            $trimmed = trim($value);
+
+            if ($trimmed === '' || !ctype_digit($trimmed)) {
+                return null;
+            }
+
+            $raw = ltrim($trimmed, '0');
+            $id = $raw === '' ? 0 : (int) $raw;
+
+            return $id > 0 ? $id : null;
+        }
+
+        return null;
+    }
+
+    private function normalizeAssignmentWorkerCode(string $value): string
+    {
+        $converted = mb_convert_kana($value, 'as', 'UTF-8');
+
+        return mb_strtoupper(trim($converted), 'UTF-8');
+    }
+
+    private function normalizeAssignmentLocker(string $value): string
+    {
+        return trim(mb_convert_kana($value, 'n', 'UTF-8'));
+    }
+
+    private function candidateHasExistingAssignment(Candidate $candidate): bool
+    {
+        return filled($candidate->assignment_worker_code_a)
+            || filled($candidate->assignment_worker_code_b)
+            || filled($candidate->assignment_locker);
+    }
+
+    private function assignmentFormatErrorResponse(): JsonResponse
+    {
+        return response()->json([
+            'message' => 'コピーされたデータフォーマットが不正です',
+        ], 422);
     }
 }

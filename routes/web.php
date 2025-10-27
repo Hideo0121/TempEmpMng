@@ -28,6 +28,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/candidates', [CandidateController::class, 'index'])->name('candidates.index');
     Route::get('/candidates/names', [CandidateController::class, 'names'])->name('candidates.names');
+    Route::post('/candidates/assignments/clipboard', [CandidateController::class, 'registerAssignmentsFromClipboard'])->name('candidates.assignments.clipboard');
     Route::get('/candidates/export', [CandidateController::class, 'export'])->name('candidates.export');
     Route::get('/candidates/create', [CandidateController::class, 'create'])->name('candidates.create');
     Route::post('/candidates', [CandidateController::class, 'store'])->name('candidates.store');
