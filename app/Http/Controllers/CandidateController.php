@@ -1046,21 +1046,26 @@ class CandidateController extends Controller
         $user = $request->user();
         [$sortKey, $sortDirection] = $this->parseSort($request);
 
-        $names = [];
+        $rows = [];
 
         $this->filteredCandidatesQuery($request, $user, $sortKey, $sortDirection, false)
-            ->chunk(500, function ($chunk) use (&$names) {
+            ->chunk(500, function ($chunk) use (&$rows) {
                 foreach ($chunk as $candidate) {
                     $name = (string) ($candidate->name ?? '');
 
-                    if ($name !== '') {
-                        $names[] = $name;
+                    if ($name === '') {
+                        continue;
                     }
+
+                    $kana = (string) ($candidate->name_kana ?? '');
+                    $id = str_pad((string) ($candidate->id ?? ''), 6, '0', STR_PAD_LEFT);
+
+                    $rows[] = sprintf("%s\t%s\t%s", $name, $kana, $id);
                 }
             });
 
         return response()->json([
-            'names' => $names,
+            'names' => $rows,
         ]);
     }
 
