@@ -200,16 +200,13 @@ class CandidateController extends Controller
         }
 
         if ($keyword = (string) $request->string('keyword')->trim()) {
-            $normalizedKeyword = mb_convert_kana($keyword, 's');
-            $phrases = preg_split('/\s+/', $normalizedKeyword, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-            $phrases = array_values(array_filter($phrases, static fn ($phrase) => trim($phrase) !== ''));
-
-            if (empty($phrases)) {
-                $phrases = [$normalizedKeyword];
-            }
-
             $logic = strtolower((string) $request->query('keyword_logic', 'and'));
             $useOr = $logic === 'or';
+            $phrases = $this->tokenizeKeywordPhrases($keyword, $useOr);
+
+            if (empty($phrases)) {
+                $phrases = [$this->normalizeKeywordPhrase($keyword)];
+            }
 
             $query->where(function ($outer) use ($phrases, $useOr) {
                 $isFirst = true;
@@ -1230,6 +1227,55 @@ class CandidateController extends Controller
                 ->get(),
             'employedStatusCodes' => CandidateStatus::employedCodes(),
         ];
+    }
+
+    private function tokenizeKeywordPhrases(string $keyword, bool $useOr): array
+    {
+        $normalized = str_replace(["\r\n", "\r"], "\n", $keyword);
+        $phrases = [];
+
+        $hasExplicitSeparator = str_contains($normalized, "\n") || str_contains($normalized, "\t");
+
+        if ($useOr && $hasExplicitSeparator) {
+            $segments = preg_split('/[\n\t]+/u', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+            foreach ($segments as $segment) {
+                $normalizedPhrase = $this->normalizeKeywordPhrase($segment);
+
+                if ($normalizedPhrase !== '') {
+                    $phrases[] = $normalizedPhrase;
+                }
+            }
+
+            return $phrases;
+        }
+
+    $pattern = "/\"([^\"]+)\"|'([^']+)'|[^\s]+/u";
+        preg_match_all($pattern, $normalized, $matches);
+
+        $count = count($matches[0]);
+
+        for ($i = 0; $i < $count; $i++) {
+            $phrase = $matches[1][$i] !== ''
+                ? $matches[1][$i]
+                : ($matches[2][$i] !== '' ? $matches[2][$i] : $matches[0][$i]);
+
+            $normalizedPhrase = $this->normalizeKeywordPhrase($phrase);
+
+            if ($normalizedPhrase !== '') {
+                $phrases[] = $normalizedPhrase;
+            }
+        }
+
+        return $phrases;
+    }
+
+    private function normalizeKeywordPhrase(string $phrase): string
+    {
+        $converted = mb_convert_kana($phrase, 's');
+        $singleSpaced = preg_replace('/\s+/u', ' ', $converted ?? '');
+
+        return trim((string) $singleSpaced);
     }
 
     private function parseCandidateIdKeyword(string $phrase): ?int

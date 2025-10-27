@@ -290,7 +290,9 @@
                 <span>{{ $sortDescription }}</span>
             </div>
             <div class="flex items-center gap-3 text-sm">
-                <button type="button" class="rounded-full border border-emerald-200 px-3 py-1 font-semibold text-emerald-600 transition hover:bg-emerald-50" data-assign-from-clipboard data-assign-url="{{ $assignmentImportUrl }}">アサイン情報登録</button>
+                @if (auth()->user()?->isManager())
+                    <button type="button" class="rounded-full border border-emerald-200 px-3 py-1 font-semibold text-emerald-600 transition hover:bg-emerald-50" data-assign-from-clipboard data-assign-url="{{ $assignmentImportUrl }}">アサイン情報登録</button>
+                @endif
                 <button type="button" class="rounded-full border border-blue-200 px-3 py-1 font-semibold text-blue-600 transition hover:bg-blue-50" data-copy-names data-copy-names-url="{{ $namesUrl }}">氏名コピー</button>
                 <a href="{{ route('candidates.export', request()->query()) }}"
                     class="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600 transition hover:bg-slate-200">CSVエクスポート</a>

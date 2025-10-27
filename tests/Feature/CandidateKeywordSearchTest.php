@@ -60,11 +60,11 @@ class CandidateKeywordSearchTest extends TestCase
         ]));
 
         $response->assertOk();
-    $rows = $response->json('names');
-    $this->assertCount(1, $rows);
+        $rows = $response->json('names');
+        $this->assertCount(1, $rows);
 
-    $columns = explode("\t", $rows[0]);
-    $this->assertSame(['佐藤一郎', 'サトウイチロウ', '000007'], $columns);
+        $columns = explode("\t", $rows[0]);
+        $this->assertSame(['佐藤一郎', 'サトウイチロウ', '000007'], $columns);
     }
 
     public function test_keyword_supports_multiple_ids_with_or_logic(): void
@@ -106,6 +106,47 @@ class CandidateKeywordSearchTest extends TestCase
         $this->assertSame(['000003', '000008'], $ids);
     }
 
+    public function test_keyword_supports_or_logic_with_multiline_names_containing_spaces(): void
+    {
+        [$user, $agency, $job] = $this->prepareCoreData();
+
+        $records = [
+            ['id' => 21, 'name' => '山田 太郎', 'name_kana' => 'ヤマダタロウ'],
+            ['id' => 22, 'name' => '佐藤 花子', 'name_kana' => 'サトウハナコ'],
+            ['id' => 23, 'name' => '高橋一郎', 'name_kana' => 'タカハシイチロウ'],
+        ];
+
+        foreach ($records as $record) {
+            Candidate::create([
+                'id' => $record['id'],
+                'name' => $record['name'],
+                'name_kana' => $record['name_kana'],
+                'agency_id' => $agency->id,
+                'wish_job1_id' => $job->id,
+                'introduced_on' => Carbon::today(),
+                'handler1_user_id' => $user->id,
+                'status_code' => CandidateStatus::CODE_VISIT_PENDING,
+                'status_changed_on' => Carbon::today(),
+                'created_by' => $user->id,
+                'updated_by' => $user->id,
+            ]);
+        }
+
+        $keyword = "山田 太郎\n佐藤 花子";
+
+        $response = $this->actingAs($user)->getJson(route('candidates.names', [
+            'keyword' => $keyword,
+            'keyword_logic' => 'or',
+        ]));
+
+        $response->assertOk();
+        $rows = $response->json('names');
+        $names = array_map(static fn ($row) => explode("\t", $row)[0] ?? '', $rows);
+        sort($names);
+
+        $this->assertSame(['佐藤 花子', '山田 太郎'], $names);
+    }
+
     public function test_keyword_supports_mixed_id_and_text_with_and_logic(): void
     {
         [$user, $agency, $job] = $this->prepareCoreData();
@@ -144,11 +185,11 @@ class CandidateKeywordSearchTest extends TestCase
         ]));
 
         $response->assertOk();
-    $rows = $response->json('names');
-    $this->assertCount(1, $rows);
+        $rows = $response->json('names');
+        $this->assertCount(1, $rows);
 
-    $columns = explode("\t", $rows[0]);
-    $this->assertSame(['笠井秀夫', 'カサイヒデオ', '000015'], $columns);
+        $columns = explode("\t", $rows[0]);
+        $this->assertSame(['笠井秀夫', 'カサイヒデオ', '000015'], $columns);
     }
 
     private function seedCandidateStatus(): void
